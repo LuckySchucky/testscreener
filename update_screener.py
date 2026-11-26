@@ -5,28 +5,59 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# Deine Watchlist & Depots (beliebig erweiterbar)
+# Erweiterte Watchlist & Fokus-Sektoren
 UNIVERSE = [
+    # AI & Cloud Infrastruktur (2030 Fokus)
     {"ticker": "ORCL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "IREN", "strategy": "Turnaround", "tag": "AI Data Center"},
+    {"ticker": "CIFR", "strategy": "Turnaround", "tag": "AI Data Center"},
     {"ticker": "DELL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
-    {"ticker": "VLN", "strategy": "Turnaround", "tag": "Semiconductors"},
-    {"ticker": "INTC", "strategy": "Turnaround", "tag": "Semiconductors"},
-    {"ticker": "AAPL", "strategy": "Cashflow", "tag": "Big Tech"},
+    {"ticker": "HPE", "strategy": "Cashflow", "tag": "AI Data Center"},
+    {"ticker": "SMCI", "strategy": "Turnaround", "tag": "AI Data Center"},
     {"ticker": "NVDA", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "MSFT", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
+    {"ticker": "AAPL", "strategy": "Cashflow", "tag": "Big Tech"},
+
+    # Halbleiter & Photonics
+    {"ticker": "VLN", "strategy": "Turnaround", "tag": "Semiconductors"},
+    {"ticker": "INTC", "strategy": "Turnaround", "tag": "Semiconductors"},
+    {"ticker": "AMD", "strategy": "Wachstum", "tag": "Semiconductors"},
+    {"ticker": "MU", "strategy": "Wachstum", "tag": "Semiconductors"},
+    {"ticker": "ARM", "strategy": "Wachstum", "tag": "Semiconductors"},
+    {"ticker": "ASML", "strategy": "Wachstum", "tag": "Semiconductors"},
+
+    # Energie, Speicher & Grid-Engpässe
     {"ticker": "EOSE", "strategy": "Turnaround", "tag": "Energy & Grid"},
     {"ticker": "RUN", "strategy": "Turnaround", "tag": "Energy & Grid"},
     {"ticker": "FLNC", "strategy": "Wachstum", "tag": "Energy & Grid"},
-    {"ticker": "HPE", "strategy": "Cashflow", "tag": "AI Data Center"},
-    {"ticker": "RHM.DE", "strategy": "Wachstum", "tag": "Europa & Defense"},
-    {"ticker": "SIE.DE", "strategy": "Dividende", "tag": "Europa & Defense"},
+    {"ticker": "DFLI", "strategy": "Turnaround", "tag": "Energy & Grid"},
+    {"ticker": "NVVE", "strategy": "Turnaround", "tag": "Energy & Grid"},
+    {"ticker": "BTU", "strategy": "Cashflow", "tag": "Energy & Grid"},
+    {"ticker": "VST", "strategy": "Wachstum", "tag": "Energy & Grid"},
+    {"ticker": "CEG", "strategy": "Wachstum", "tag": "Energy & Grid"},
+
+    # Small Caps / Drohnen / Spezialwerte
+    {"ticker": "ZENA", "strategy": "Wachstum", "tag": "Tech & Robotics"},
+
+    # Healthcare & Biotech
+    {"ticker": "HIMS", "strategy": "Wachstum", "tag": "Healthcare"},
     {"ticker": "NVO", "strategy": "Wachstum", "tag": "Healthcare"},
     {"ticker": "LLY", "strategy": "Wachstum", "tag": "Healthcare"},
-    {"ticker": "HIMS", "strategy": "Wachstum", "tag": "Healthcare"},
+
+    # Europa & Turnaround-Klassiker
+    {"ticker": "RHM.DE", "strategy": "Wachstum", "tag": "Europa & Industrie"},
+    {"ticker": "SIE.DE", "strategy": "Dividende", "tag": "Europa & Industrie"},
+    {"ticker": "BAS.DE", "strategy": "Dividende", "tag": "Turnaround Watch"},
+    {"ticker": "BAYN.DE", "strategy": "Turnaround", "tag": "Turnaround Watch"},
     {"ticker": "PYPL", "strategy": "Turnaround", "tag": "Turnaround Watch"},
     {"ticker": "NKE", "strategy": "Turnaround", "tag": "Turnaround Watch"},
-    {"ticker": "BAS.DE", "strategy": "Dividende", "tag": "Turnaround Watch"},
+
+    # Asien / China Tech & Speicherchips
+    {"ticker": "BABA", "strategy": "Turnaround", "tag": "Asien & China Tech"},
+    {"ticker": "JD", "strategy": "Turnaround", "tag": "Asien & China Tech"},
+    {"ticker": "BIDU", "strategy": "Turnaround", "tag": "Asien & China Tech"},
+    {"ticker": "005930.KS", "strategy": "Cashflow", "tag": "Asien & China Tech"},
+    {"ticker": "000660.KS", "strategy": "Wachstum", "tag": "Asien & China Tech"},
 ]
 
 COUNTRY_MAP = {
@@ -37,6 +68,10 @@ COUNTRY_MAP = {
     "Denmark": "Dänemark",
     "Israel": "Israel",
     "Australia": "Australien",
+    "China": "China",
+    "Hong Kong": "Hongkong",
+    "South Korea": "Südkorea",
+    "Canada": "Kanada",
 }
 
 SECTOR_MAP = {
@@ -63,7 +98,7 @@ def calc_rsi(series, period=14):
     rsi = 100 - (100 / (1 + rs))
     return float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0
 
-def calc_wlatar(close: pd.Series):
+def calc_tech_score(close: pd.Series):
     """Technisches Rating (0-100): Trendlage, RSI-Zone, Abstand 52W-Hoch, Momentum."""
     price = float(close.iloc[-1])
     sma50 = float(close.rolling(50).mean().iloc[-1])
@@ -82,7 +117,7 @@ def calc_wlatar(close: pd.Series):
     if sma50 > sma200:
         trend_score += 5
 
-    # 2. RSI-Zone (max 25 Punkte - ideal zwischen 40 und 65, überverkauft ebenfalls interessant)
+    # 2. RSI-Zone (max 25 Punkte)
     if 42 <= rsi <= 65:
         rsi_score = 25
     elif 30 <= rsi < 42:
@@ -101,7 +136,7 @@ def calc_wlatar(close: pd.Series):
     # 4. 3-Monats-Momentum (max 20 Punkte)
     mom_score = max(0, min(20, 10 + mom_3m * 0.5))
 
-    wlatar = clamp(trend_score + rsi_score + high_score + mom_score)
+    score = clamp(trend_score + rsi_score + high_score + mom_score)
     metrics = {
         "price": round(price, 2),
         "sma50": round(sma50, 2),
@@ -111,13 +146,13 @@ def calc_wlatar(close: pd.Series):
         "rsi": round(rsi, 1),
         "mom3m": round(mom_3m, 1),
     }
-    return wlatar, metrics
+    return score, metrics
 
-def calc_wlafar(info: dict):
+def calc_funda_score(info: dict):
     """Fundamentales Rating (0-100): Umsatzwachstum, ROE, Verschuldung, Bewertung."""
-    rev_growth = info.get("revenueGrowth")  # z.B. 0.18 = 18%
-    roe = info.get("returnOnEquity")        # z.B. 0.25 = 25%
-    debt_to_eq = info.get("debtToEquity")   # z.B. 85.0 = 85%
+    rev_growth = info.get("revenueGrowth")
+    roe = info.get("returnOnEquity")
+    debt_to_eq = info.get("debtToEquity")
     forward_pe = info.get("forwardPE")
     profit_margin = info.get("profitMargins")
 
@@ -135,7 +170,7 @@ def calc_wlafar(info: dict):
     else:
         roe_score = 14
 
-    # 3. Verschuldungsgrad (max 20 Punkte - niedriger ist besser)
+    # 3. Verschuldungsgrad (max 20 Punkte)
     if debt_to_eq is None:
         d_score = 12
     elif debt_to_eq < 50:
@@ -161,8 +196,8 @@ def calc_wlafar(info: dict):
 
     return clamp(g_score + roe_score + d_score + pe_score)
 
-def determine_status_and_rating(m: dict, wlatar: int, wlafar: int):
-    """Automatische Zuweisung von Status & Rating anhand Trendlinien & Unterstützungszonen."""
+def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
+    """Automatische Zuweisung von Chart-Phase & Signal anhand Trendlinien & Unterstützungszonen."""
     p = m["price"]
     s50 = m["sma50"]
     s200 = m["sma200"]
@@ -170,9 +205,8 @@ def determine_status_and_rating(m: dict, wlatar: int, wlafar: int):
     low52 = m["low52w"]
     high52 = m["high52w"]
     pos_in_range = (p - low52) / max(0.01, (high52 - low52))
-    total_score = wlatar * 0.55 + wlafar * 0.45
+    total_score = tech_score * 0.55 + funda_score * 0.45
 
-    # Status-Logik nach Trendlinien & Unterstützungszonen
     if p < s200 * 0.94 and p < s50 and rsi < 38:
         if pos_in_range < 0.22:
             status = "Bodenbildung"
@@ -191,7 +225,6 @@ def determine_status_and_rating(m: dict, wlatar: int, wlafar: int):
     else:
         status = "Underperformance"
 
-    # Rating-Logik (kaufen / halten / verkaufen)
     if total_score >= 60 and status in ("Bodenbildung", "Turnaround", "Position verwalten", "Regression abwarten"):
         rating = "kaufen"
     elif total_score < 42 or status == "Trendbruch":
@@ -199,10 +232,9 @@ def determine_status_and_rating(m: dict, wlatar: int, wlafar: int):
     else:
         rating = "halten"
 
-    # Chance (1-5) & Risiko (1-5)
     chance = max(1, min(5, math.ceil(total_score / 20)))
     vol_spread = (high52 - low52) / max(0.01, low52)
-    risk = 5 if vol_spread > 1.2 or wlafar < 40 else (4 if vol_spread > 0.75 else (3 if vol_spread > 0.45 else 2))
+    risk = 5 if vol_spread > 1.2 or funda_score < 40 else (4 if vol_spread > 0.75 else (3 if vol_spread > 0.45 else 2))
 
     return status, rating, chance, risk
 
@@ -219,11 +251,10 @@ def build_dataset():
             close = hist["Close"].dropna()
             info = tk.info or {}
 
-            wlatar, m = calc_wlatar(close)
-            wlafar = calc_wlafar(info)
-            status, rating, chance, risk = determine_status_and_rating(m, wlatar, wlafar)
+            tech_score, m = calc_tech_score(close)
+            funda_score = calc_funda_score(info)
+            status, rating, chance, risk = determine_status_and_rating(m, tech_score, funda_score)
 
-            # 12-Monats-Chartpunkte (ca. 24 Stützstellen für flüssige Darstellung)
             step = max(1, len(close) // 24)
             chart_points = [round(float(x), 2) for x in close.iloc[::step].tolist()]
             if chart_points[-1] != m["price"]:
@@ -244,8 +275,8 @@ def build_dataset():
                 "status": status,
                 "country": COUNTRY_MAP.get(raw_country, raw_country),
                 "sector": SECTOR_MAP.get(raw_sector, raw_sector),
-                "wlatar": wlatar,
-                "wlafar": wlafar,
+                "tech_score": tech_score,
+                "funda_score": funda_score,
                 "price": m["price"],
                 "currency": info.get("currency", "USD"),
                 "sma50": m["sma50"],
@@ -256,7 +287,7 @@ def build_dataset():
                 "revGrowth": round(info["revenueGrowth"] * 100, 1) if info.get("revenueGrowth") else None,
                 "history": chart_points,
             })
-            print(f"OK: {symbol} -> {rating} | {status} | WLATAR={wlatar}, WLAFAR={wlafar}")
+            print(f"OK: {symbol} -> {rating} | {status} | Tech={tech_score}, Funda={funda_score}")
         except Exception as e:
             print(f"Fehler bei {symbol}: {e}")
 

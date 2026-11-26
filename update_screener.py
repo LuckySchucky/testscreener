@@ -266,7 +266,6 @@ def build_dataset():
             close = hist["Close"].dropna()
             tech_score, m = calc_tech_score(close)
 
-            # Fundamentaldaten abrufen (bei großen Listen robust absichern)
             info = {}
             try:
                 info = tk.info or {}

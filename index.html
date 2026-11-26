@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AlphaPulse — Aktien-Scanner</title>
+  <title>AlphaPulse — Eigenständiger Aktien-Scanner</title>
   <style>
     :root {
       --bg-main: #0b1120;
@@ -42,6 +42,7 @@
       padding: 24px 20px;
     }
 
+    /* Header */
     header {
       display: flex;
       flex-wrap: wrap;
@@ -104,17 +105,7 @@
       box-shadow: 0 0 8px var(--accent);
     }
 
-    .error-box {
-      display: none;
-      background: rgba(239, 68, 68, 0.14);
-      border: 1px solid rgba(239, 68, 68, 0.5);
-      color: #fecaca;
-      padding: 14px 18px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      font-size: 13px;
-    }
-
+    /* KPI Leiste */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -143,6 +134,7 @@
       color: var(--text-primary);
     }
 
+    /* Filter Panel */
     .filter-panel {
       background: var(--bg-surface);
       border: 1px solid var(--border);
@@ -175,6 +167,8 @@
       letter-spacing: 0.06em;
       color: var(--text-secondary);
       margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
     }
 
     .pill-wrap {
@@ -217,6 +211,7 @@
       font-size: 11px;
     }
 
+    /* Sliders */
     .slider-box {
       background: var(--bg-card);
       border: 1px solid var(--border);
@@ -253,6 +248,7 @@
       cursor: pointer;
     }
 
+    /* Toolbar */
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -293,6 +289,7 @@
       color: var(--text-primary);
     }
 
+    /* Table */
     .table-wrap {
       background: var(--bg-surface);
       border: 1px solid var(--border);
@@ -419,6 +416,7 @@
       background: var(--accent);
     }
 
+    /* Modal */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -504,16 +502,14 @@
         <div class="brand-logo">AP</div>
         <div>
           <h1>AlphaPulse Market Scanner</h1>
-          <p>Automatisierte Trend-, Momentum- &amp; Fundamental-Analyse</p>
+          <p>Automatisierte Trend-, Momentum- & Fundamental-Analyse</p>
         </div>
       </div>
       <div class="sync-badge">
         <span class="sync-dot"></span>
-        <span id="lastUpdated">Initialisiere...</span>
+        <span id="lastUpdated">Lade Marktdaten...</span>
       </div>
     </header>
-
-    <div class="error-box" id="errorBox"></div>
 
     <section class="kpi-grid">
       <div class="kpi-card">
@@ -553,7 +549,7 @@
       <div>
         <div class="slider-box">
           <div class="slider-header">
-            <span>Tech-Score (Trend &amp; Momentum)</span>
+            <span>Tech-Score (Trend & Momentum)</span>
             <span class="slider-val" id="techRangeLabel">0 – 100</span>
           </div>
           <div class="range-row">
@@ -564,7 +560,7 @@
 
         <div class="slider-box">
           <div class="slider-header">
-            <span>Funda-Score (Bilanz &amp; Wachstum)</span>
+            <span>Funda-Score (Bilanz & Wachstum)</span>
             <span class="slider-val" id="fundaRangeLabel">0 – 100</span>
           </div>
           <div class="range-row">
@@ -597,8 +593,8 @@
             <th data-sort="rating">Signal ↕</th>
             <th data-sort="status">Phase ↕</th>
             <th data-sort="chance">Chance ↕</th>
-            <th data-sort="tech_score">Tech-Score ↕</th>
-            <th data-sort="funda_score">Funda-Score ↕</th>
+            <th data-sort="wlatar">Tech-Score ↕</th>
+            <th data-sort="wlafar">Funda-Score ↕</th>
             <th data-sort="sector">Sektor ↕</th>
             <th data-sort="country">Land ↕</th>
           </tr>
@@ -608,6 +604,7 @@
     </div>
   </div>
 
+  <!-- Detail Modal -->
   <div class="modal-backdrop" id="modalBackdrop">
     <div class="modal">
       <div class="modal-head">
@@ -627,7 +624,7 @@
     let selectedRatings = new Set();
     let selectedStatuses = new Set();
     let selectedTags = new Set();
-    let sortKey = 'tech_score';
+    let sortKey = 'wlatar';
     let sortAsc = false;
 
     const RATINGS = ['kaufen', 'halten', 'verkaufen'];
@@ -637,62 +634,20 @@
       'Trendbruch', 'Underperformance'
     ];
 
-    function showError(msg) {
-      const box = document.getElementById('errorBox');
-      box.style.display = 'block';
-      box.textContent = msg;
-    }
-
-    function normalizeStock(s) {
-      if (!s || typeof s !== 'object') return null;
-      const tech = Number(s.tech_score ?? s.wlatar ?? 50);
-      const funda = Number(s.funda_score ?? s.wlafar ?? 50);
-      const chance = Number(s.chance ?? 3);
-      return {
-        name: String(s.name || s.ticker || 'Unbekannt'),
-        ticker: String(s.ticker || ''),
-        isin: String(s.isin || '—'),
-        tag: String(s.tag || ''),
-        chance: Number.isFinite(chance) ? Math.max(1, Math.min(5, chance)) : 3,
-        rating: String(s.rating || 'halten'),
-        status: String(s.status || 'Underperformance'),
-        country: String(s.country || '—'),
-        sector: String(s.sector || '—'),
-        tech_score: Number.isFinite(tech) ? Math.max(0, Math.min(100, tech)) : 50,
-        funda_score: Number.isFinite(funda) ? Math.max(0, Math.min(100, funda)) : 50,
-        price: s.price != null && Number.isFinite(Number(s.price)) ? Number(s.price) : null,
-        currency: String(s.currency || ''),
-        sma50: s.sma50 ?? '—',
-        sma200: s.sma200 ?? '—',
-        rsi: s.rsi ?? '—',
-        mom3m: s.mom3m ?? '—',
-        forwardPE: s.forwardPE ?? '—',
-        revGrowth: s.revGrowth ?? null,
-        history: Array.isArray(s.history) ? s.history.map(Number).filter(Number.isFinite) : []
-      };
-    }
-
     async function loadData() {
-      const statusEl = document.getElementById('lastUpdated');
       try {
-        const res = await fetch('./data.json?t=' + Date.now(), { cache: 'no-store' });
-        if (!res.ok) {
-          throw new Error('data.json nicht erreichbar (HTTP ' + res.status + ')');
-        }
-        const text = await res.text();
-        const json = JSON.parse(text);
-        const rawList = Array.isArray(json.stocks) ? json.stocks : (Array.isArray(json) ? json : []);
-        allStocks = rawList.map(normalizeStock).filter(Boolean);
-        statusEl.textContent = 'Stand: ' + (json.updated_at || 'Aktuell') + ` · ${allStocks.length} Werte`;
-        if (!allStocks.length) {
-          showError('Die data.json wurde geladen, enthält aber aktuell keine Einträge.');
-        }
+        const res = await fetch('./data.json?t=' + Date.now());
+        if (!res.ok) throw new Error('Keine data.json gefunden');
+        const json = await res.json();
+        allStocks = json.stocks || [];
+        document.getElementById('lastUpdated').textContent = 'Stand: ' + (json.updated_at || 'Aktuell');
       } catch (e) {
-        statusEl.textContent = 'Ladefehler';
-        showError('Konnte data.json nicht verarbeiten: ' + (e.message || e));
-        allStocks = [];
+        document.getElementById('lastUpdated').textContent = 'Demo-Modus (warte auf data.json)';
+        allStocks = [
+          { name: 'Oracle Corp.', ticker: 'ORCL', isin: 'US68389X1054', tag: 'AI & Cloud 2030', chance: 4, risk: 3, rating: 'kaufen', status: 'Position verwalten', country: 'USA', sector: 'Informationstechnologie', wlatar: 76, wlafar: 68, price: 168.4, currency: 'USD', sma50: 161.2, sma200: 142.8, rsi: 56.4, mom3m: 14.2, forwardPE: 24.5, revGrowth: 8.4, history: [120,125,131,128,139,145,152,149,158,164,168.4] },
+          { name: 'IREN Ltd.', ticker: 'IREN', isin: 'AU0000185993', tag: 'AI Data Center', chance: 5, risk: 5, rating: 'kaufen', status: 'Turnaround', country: 'Australien', sector: 'Informationstechnologie', wlatar: 71, wlafar: 58, price: 11.8, currency: 'USD', sma50: 9.9, sma200: 10.4, rsi: 59.1, mom3m: 22.0, forwardPE: 19.2, revGrowth: 45.0, history: [7.2,8.1,6.9,8.8,11.2,13.4,10.1,9.5,10.8,11.8] }
+        ];
       }
-
       buildFilterPills();
       render();
     }
@@ -743,4 +698,149 @@
       const cMin = +document.getElementById('chanceMin').value;
 
       document.getElementById('techRangeLabel').textContent = `${tMin} – ${tMax}`;
-      document.getElement
+      document.getElementById('fundaRangeLabel').textContent = `${fMin} – ${fMax}`;
+      document.getElementById('chanceLabel').textContent = `ab ${cMin}`;
+
+      let filtered = allStocks.filter(s => {
+        if (selectedRatings.size && !selectedRatings.has(s.rating)) return false;
+        if (selectedStatuses.size && !selectedStatuses.has(s.status)) return false;
+        if (selectedTags.size && !selectedTags.has(s.tag)) return false;
+        if (s.wlatar < tMin || s.wlatar > tMax) return false;
+        if (s.wlafar < fMin || s.wlafar > fMax) return false;
+        if (s.chance < cMin) return false;
+        if (q) {
+          const hay = `${s.name} ${s.ticker} ${s.isin} ${s.country} ${s.sector}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        const v1 = a[sortKey] ?? '';
+        const v2 = b[sortKey] ?? '';
+        if (typeof v1 === 'number' && typeof v2 === 'number') {
+          return sortAsc ? v1 - v2 : v2 - v1;
+        }
+        return sortAsc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
+      });
+
+      // KPIs aktualisieren
+      document.getElementById('kpiTotal').textContent = filtered.length;
+      document.getElementById('kpiBuy').textContent = filtered.filter(s => s.rating === 'kaufen').length;
+      const avgTech = filtered.length ? Math.round(filtered.reduce((a, b) => a + b.wlatar, 0) / filtered.length) : 0;
+      const avgFunda = filtered.length ? Math.round(filtered.reduce((a, b) => a + b.wlafar, 0) / filtered.length) : 0;
+      document.getElementById('kpiTech').textContent = avgTech;
+      document.getElementById('kpiFunda').textContent = avgFunda;
+
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = filtered.map((s, idx) => {
+        const badgeCls = s.rating === 'kaufen' ? 'badge-buy' : (s.rating === 'verkaufen' ? 'badge-sell' : 'badge-hold');
+        const dots = [1,2,3,4,5].map(i => `<span class="dot ${i <= s.chance ? 'filled' : ''}"></span>`).join('');
+        return `
+          <tr data-idx="${idx}">
+            <td>
+              <div class="stock-name">${s.name}</div>
+              <div class="stock-sub">${s.ticker} · ${s.tag || ''}</div>
+            </td>
+            <td><strong>${s.price ?? '—'}</strong> <span class="stock-sub">${s.currency || ''}</span></td>
+            <td><span class="badge ${badgeCls}">${s.rating}</span></td>
+            <td><span class="status-chip">${s.status}</span></td>
+            <td><div class="chance-dots">${dots}</div></td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-fill" style="width:${s.wlatar}%"></div></div>
+                <strong>${s.wlatar}</strong>
+              </div>
+            </td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-fill" style="width:${s.wlafar}%"></div></div>
+                <strong>${s.wlafar}</strong>
+              </div>
+            </td>
+            <td>${s.sector || '—'}</td>
+            <td>${s.country || '—'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('tr').forEach(tr => {
+        tr.addEventListener('click', () => openModal(filtered[+tr.dataset.idx]));
+      });
+    }
+
+    function openModal(s) {
+      document.getElementById('mTitle').textContent = `${s.name} (${s.ticker})`;
+      document.getElementById('mSub').textContent = `${s.sector} · ${s.country} · ISIN: ${s.isin}`;
+      document.getElementById('mMetrics').innerHTML = `
+        <div class="metric-item"><span>Aktueller Kurs</span><strong>${s.price} ${s.currency}</strong></div>
+        <div class="metric-item"><span>Tech-Score / Funda-Score</span><strong>${s.wlatar} / ${s.wlafar}</strong></div>
+        <div class="metric-item"><span>RSI (14) & 3M-Momentum</span><strong>${s.rsi ?? '—'} / ${s.mom3m ?? '—'}%</strong></div>
+        <div class="metric-item"><span>SMA 50 / SMA 200</span><strong>${s.sma50 ?? '—'} / ${s.sma200 ?? '—'}</strong></div>
+        <div class="metric-item"><span>Forward KGV</span><strong>${s.forwardPE ?? '—'}</strong></div>
+        <div class="metric-item"><span>Umsatzwachstum</span><strong>${s.revGrowth != null ? s.revGrowth + '%' : '—'}</strong></div>
+      `;
+      document.getElementById('modalBackdrop').classList.add('open');
+      drawChart(s.history || []);
+    }
+
+    function drawChart(pts) {
+      const canvas = document.getElementById('priceChart');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (pts.length < 2) return;
+
+      const min = Math.min(...pts);
+      const max = Math.max(...pts);
+      const pad = 20;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      pts.forEach((v, i) => {
+        const x = pad + (i / (pts.length - 1)) * w;
+        const y = pad + h - ((v - min) / Math.max(0.001, max - min)) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    document.getElementById('modalClose').onclick = () => document.getElementById('modalBackdrop').classList.remove('open');
+    document.getElementById('modalBackdrop').onclick = (e) => {
+      if (e.target.id === 'modalBackdrop') document.getElementById('modalBackdrop').classList.remove('open');
+    };
+
+    ['searchInput', 'techMin', 'techMax', 'fundaMin', 'fundaMax', 'chanceMin'].forEach(id => {
+      document.getElementById(id).addEventListener('input', render);
+    });
+
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortKey === key) sortAsc = !sortAsc;
+        else { sortKey = key; sortAsc = false; }
+        render();
+      });
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      selectedRatings.clear();
+      selectedStatuses.clear();
+      selectedTags.clear();
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      document.getElementById('searchInput').value = '';
+      document.getElementById('techMin').value = 0;
+      document.getElementById('techMax').value = 100;
+      document.getElementById('fundaMin').value = 0;
+      document.getElementById('fundaMax').value = 100;
+      document.getElementById('chanceMin').value = 1;
+      render();
+    });
+
+    loadData();
+  </script>
+</body>
+</html>

@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# Limit für Ticker pro Lauf (bei GitHub Actions z. B. 250–350 testen)
 MAX_TICKERS = 500
 
 INCLUDE_DAX = True
@@ -204,6 +203,17 @@ def build_universe():
     return universe[:MAX_TICKERS]
 
 
+def get_benchmark_mom3m(symbol="^GSPC"):
+    try:
+        hist = yf.Ticker(symbol).history(period="6mo", interval="1d")
+        close = hist["Close"].dropna()
+        if len(close) >= 63:
+            return round((float(close.iloc[-1]) / float(close.iloc[-63]) - 1) * 100, 1)
+    except Exception as e:
+        print(f"Benchmark {symbol} nicht abrufbar: {e}")
+    return 0.0
+
+
 def clamp(val, low=0, high=100):
     return int(round(max(low, min(high, val))))
 
@@ -217,7 +227,10 @@ def calc_rsi(series, period=14):
     return float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0
 
 
-def calc_tech_score(close: pd.Series):
+def calc_tech_score(hist: pd.DataFrame, bench_mom3m: float):
+    close = hist["Close"].dropna()
+    volume = hist["Volume"].dropna() if "Volume" in hist.columns else pd.Series(dtype=float)
+
     price = float(close.iloc[-1])
     sma50 = float(close.rolling(50).mean().iloc[-1])
     sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else sma50
@@ -225,6 +238,9 @@ def calc_tech_score(close: pd.Series):
     low_52w = float(close.tail(252).min())
     rsi = calc_rsi(close)
     mom_3m = (price / float(close.iloc[-63]) - 1) * 100 if len(close) >= 63 else 0.0
+    rs_3m = mom_3m - bench_mom3m
+    dist_high_pct = ((price / high_52w) - 1) * 100 if high_52w > 0 else 0.0
+    avg_vol_20d = int(round(float(volume.tail(20).mean()))) if len(volume) >= 5 else 0
 
     trend_score = 0
     if price > sma200:
@@ -245,9 +261,9 @@ def calc_tech_score(close: pd.Series):
     else:
         rsi_score = 6
 
-    dist_high = (price / high_52w) if high_52w > 0 else 0.5
-    high_score = dist_high * 20
-    mom_score = max(0, min(20, 10 + mom_3m * 0.5))
+    dist_high_ratio = (price / high_52w) if high_52w > 0 else 0.5
+    high_score = dist_high_ratio * 20
+    mom_score = max(0, min(20, 10 + mom_3m * 0.4 + rs_3m * 0.15))
 
     score = clamp(trend_score + rsi_score + high_score + mom_score)
     metrics = {
@@ -256,8 +272,11 @@ def calc_tech_score(close: pd.Series):
         "sma200": round(sma200, 2),
         "high52w": round(high_52w, 2),
         "low52w": round(low_52w, 2),
+        "distHighPct": round(dist_high_pct, 1),
         "rsi": round(rsi, 1),
         "mom3m": round(mom_3m, 1),
+        "rs3m": round(rs_3m, 1),
+        "avgVolume": avg_vol_20d,
     }
     return score, metrics
 
@@ -344,6 +363,9 @@ def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
 
 
 def build_dataset():
+    bench_mom3m = get_benchmark_mom3m("^GSPC")
+    print(f"Benchmark S&P 500 3M-Momentum: {bench_mom3m}%")
+
     universe = build_universe()
     print(f"Starte Analyse für {len(universe)} Ticker...")
     results = []
@@ -357,7 +379,7 @@ def build_dataset():
                 continue
 
             close = hist["Close"].dropna()
-            tech_score, m = calc_tech_score(close)
+            tech_score, m = calc_tech_score(hist, bench_mom3m)
 
             info = {}
             try:
@@ -395,22 +417,27 @@ def build_dataset():
                     "currency": info.get("currency", "USD"),
                     "sma50": m["sma50"],
                     "sma200": m["sma200"],
+                    "high52w": m["high52w"],
+                    "distHighPct": m["distHighPct"],
                     "rsi": m["rsi"],
                     "mom3m": m["mom3m"],
+                    "rs3m": m["rs3m"],
+                    "avgVolume": m["avgVolume"],
                     "forwardPE": round(info["forwardPE"], 1) if info.get("forwardPE") else None,
                     "revGrowth": round(info["revenueGrowth"] * 100, 1) if info.get("revenueGrowth") else None,
                     "history": chart_points,
                 }
             )
 
-            if idx % 30 == 0:
-                time.sleep(1.0)
+            if idx % 35 == 0:
+                time.sleep(0.8)
         except Exception as e:
             print(f"Fehler bei {symbol}: {e}")
 
     payload = {
         "updated_at": datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC"),
         "count": len(results),
+        "benchmark_mom3m": bench_mom3m,
         "weights": {"tech": TECH_WEIGHT, "funda": FUNDA_WEIGHT},
         "stocks": results,
     }

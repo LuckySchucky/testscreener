@@ -1,17 +1,21 @@
 import json
 import math
+import os
 import time
+import urllib.request
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# Maximale Anzahl an Tickern pro Lauf (schützt vor GitHub-Action-Timeouts & Rate-Limits)
-MAX_TICKERS = 250
-INCLUDE_SP500 = True
-INCLUDE_DAX = True
+# Limit für Ticker pro Lauf (bei GitHub Actions z. B. 250–350 testen)
+MAX_TICKERS = 300
 
-# Score-Gewichtung für Gesamtwertung, Signal & Chance (Summe = 1.0)
+INCLUDE_DAX = True
+INCLUDE_MDAX = True
+INCLUDE_SP500 = True
+INCLUDE_NASDAQ100 = True
+
 TECH_WEIGHT = 0.60
 FUNDA_WEIGHT = 0.40
 
@@ -56,6 +60,23 @@ CORE_UNIVERSE = [
     {"ticker": "000660.KS", "strategy": "Wachstum", "tag": "Asien & China Tech"},
 ]
 
+# Fester Fallback-Pool, damit auch ohne Index-Scraping viele Werte vorhanden sind
+EXTRA_UNIVERSE = [
+    "GOOGL", "AMZN", "META", "TSLA", "AVGO", "QCOM", "TXN", "MRVL", "ANET", "NOW",
+    "CRM", "PLTR", "SNOW", "MDB", "DDOG", "NET", "CRWD", "PANW", "UBER", "ABNB",
+    "SHOP", "COIN", "MSTR", "MARA", "RIOT", "CLSK", "IONQ", "RGTI", "JOBY", "ACHR",
+    "ENPH", "FSLR", "SEDG", "NEE", "DUK", "SO", "AEP", "ETR", "TLN", "OKLO",
+    "ALB", "SQM", "MP", "FCX", "NEM", "GOLD", "VALE", "RIO", "BHP", "XOM",
+    "CVX", "OXY", "SLB", "HAL", "COP", "EQT", "AR", "KMI", "WMB", "MPLX",
+    "JPM", "BAC", "GS", "MS", "V", "MA", "AXP", "BLK", "SCHW", "SOFI",
+    "UNH", "JNJ", "ABBV", "MRK", "PFE", "AMGN", "GILD", "ISRG", "TMO", "MDT",
+    "COST", "WMT", "HD", "LOW", "MCD", "SBUX", "DIS", "NFLX", "SPOT", "BKNG",
+    "SAP.DE", "ALV.DE", "DTE.DE", "MBG.DE", "BMW.DE", "VOW3.DE", "MUV2.DE", "IFX.DE",
+    "ADS.DE", "DHL.DE", "DBK.DE", "CBK.DE", "HEN3.DE", "BEI.DE", "FRE.DE", "SHL.DE",
+    "ENR.DE", "EOAN.DE", "RWE.DE", "AIR.PA", "MC.PA", "OR.PA", "TTE.PA", "SAN.PA",
+    "NOVO-B.CO", "AZN", "SHEL", "HSBC", "UL", "SONY", "TM", "TSM", "SE", "GRAB"
+]
+
 COUNTRY_MAP = {
     "United States": "USA",
     "Germany": "Deutschland",
@@ -68,6 +89,10 @@ COUNTRY_MAP = {
     "Hong Kong": "Hongkong",
     "South Korea": "Südkorea",
     "Canada": "Kanada",
+    "France": "Frankreich",
+    "Switzerland": "Schweiz",
+    "Japan": "Japan",
+    "Taiwan": "Taiwan",
 }
 
 SECTOR_MAP = {
@@ -81,45 +106,94 @@ SECTOR_MAP = {
     "Utilities": "Versorger",
     "Basic Materials": "Grundstoffe",
     "Communication Services": "Kommunikation",
+    "Real Estate": "Immobilien",
 }
 
-def fetch_index_tickers():
-    extra = []
-    seen = {x["ticker"].upper() for x in CORE_UNIVERSE}
+def read_wiki_tables(url: str):
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"}
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        html = resp.read().decode("utf-8", errors="ignore")
+    return pd.read_html(html)
 
+def extract_symbols_from_tables(tables, suffix="", default_strategy="Wachstum", default_tag="Index"):
+    found = []
+    for df in tables:
+        cols = [str(c) for c in df.columns]
+        target_col = None
+        for c in cols:
+            low = c.lower()
+            if any(k in low for k in ("symbol", "ticker", "code")):
+                target_col = c
+                break
+        if target_col is None:
+            continue
+        for raw in df[target_col].dropna().astype(str):
+            sym = raw.strip().split()[0].replace(".", "-")
+            if not sym or len(sym) > 14:
+                continue
+            if suffix and not sym.upper().endswith(suffix.upper()):
+                sym = f"{sym}{suffix}"
+            found.append({"ticker": sym, "strategy": default_strategy, "tag": default_tag})
+        if found:
+            break
+    return found
+
+def load_tickers_txt(path="tickers.txt"):
+    if not os.path.exists(path):
+        return []
+    items = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            sym = line.strip()
+            if not sym or sym.startswith("#"):
+                continue
+            items.append({"ticker": sym, "strategy": "Wachstum", "tag": "Eigene Liste"})
+    return items
+
+def build_universe():
+    universe = list(CORE_UNIVERSE)
+    seen = {x["ticker"].upper() for x in universe}
+
+    def add_items(items):
+        added = 0
+        for item in items:
+            key = item["ticker"].upper()
+            if key not in seen:
+                seen.add(key)
+                universe.append(item)
+                added += 1
+        return added
+
+    txt_items = load_tickers_txt()
+    if txt_items:
+        print(f"Aus tickers.txt geladen: {add_items(txt_items)} neue Ticker")
+
+    wiki_sources = []
     if INCLUDE_DAX:
-        try:
-            tables = pd.read_html("https://en.wikipedia.org/wiki/DAX")
-            for df in tables:
-                col = next((c for c in df.columns if "ticker" in str(c).lower() or "symbol" in str(c).lower()), None)
-                if col is not None:
-                    for sym in df[col].dropna().astype(str):
-                        sym = sym.strip().replace(".", "-")
-                        if not sym.endswith(".DE"):
-                            sym = f"{sym}.DE"
-                        if sym.upper() not in seen:
-                            seen.add(sym.upper())
-                            extra.append({"ticker": sym, "strategy": "Cashflow", "tag": "DAX"})
-                    break
-        except Exception as e:
-            print(f"DAX-Liste konnte nicht geladen werden: {e}")
-
+        wiki_sources.append(("DAX", "https://en.wikipedia.org/wiki/DAX", ".DE", "Cashflow", "DAX"))
+    if INCLUDE_MDAX:
+        wiki_sources.append(("MDAX", "https://en.wikipedia.org/wiki/MDAX", ".DE", "Wachstum", "MDAX"))
     if INCLUDE_SP500:
-        try:
-            tables = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
-            for df in tables:
-                if "Symbol" in df.columns:
-                    for sym in df["Symbol"].dropna().astype(str):
-                        sym = sym.strip().replace(".", "-")
-                        if sym.upper() not in seen:
-                            seen.add(sym.upper())
-                            extra.append({"ticker": sym, "strategy": "Wachstum", "tag": "S&P 500"})
-                    break
-        except Exception as e:
-            print(f"S&P-500-Liste konnte nicht geladen werden: {e}")
+        wiki_sources.append(("S&P 500", "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "", "Wachstum", "S&P 500"))
+    if INCLUDE_NASDAQ100:
+        wiki_sources.append(("Nasdaq 100", "https://en.wikipedia.org/wiki/Nasdaq-100", "", "Wachstum", "Nasdaq 100"))
 
-    combined = CORE_UNIVERSE + extra
-    return combined[:MAX_TICKERS]
+    for label, url, suffix, strat, tag in wiki_sources:
+        try:
+            tables = read_wiki_tables(url)
+            extracted = extract_symbols_from_tables(tables, suffix=suffix, default_strategy=strat, default_tag=tag)
+            print(f"{label}: {add_items(extracted)} neue Ticker hinzugefügt")
+        except Exception as e:
+            print(f"{label} konnte nicht geladen werden: {e}")
+
+    fallback_items = [{"ticker": s, "strategy": "Wachstum", "tag": "Fokus-Pool"} for s in EXTRA_UNIVERSE]
+    print(f"Fokus-Pool: {add_items(fallback_items)} zusätzliche Ticker hinzugefügt")
+
+    print(f"Gesamt-Universum vor Limit: {len(universe)} (Limit: {MAX_TICKERS})")
+    return universe[:MAX_TICKERS]
 
 def clamp(val, low=0, high=100):
     return int(round(max(low, min(high, val))))
@@ -256,8 +330,8 @@ def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
     return status, rating, chance, risk
 
 def build_dataset():
-    universe = fetch_index_tickers()
-    print(f"Analysiere {len(universe)} Ticker (Gewichtung Tech={TECH_WEIGHT:.0%}, Funda={FUNDA_WEIGHT:.0%})...")
+    universe = build_universe()
+    print(f"Starte Analyse für {len(universe)} Ticker...")
     results = []
 
     for idx, item in enumerate(universe, start=1):
@@ -289,25 +363,4 @@ def build_dataset():
             raw_sector = info.get("sector", "Technology")
 
             results.append({
-                "name": info.get("shortName") or info.get("longName") or symbol,
-                "ticker": symbol,
-                "isin": info.get("isin") or "—",
-                "strategy": item["strategy"],
-                "tag": item["tag"],
-                "chance": chance,
-                "risk": risk,
-                "rating": rating,
-                "status": status,
-                "country": COUNTRY_MAP.get(raw_country, raw_country),
-                "sector": SECTOR_MAP.get(raw_sector, raw_sector),
-                "tech_score": tech_score,
-                "funda_score": funda_score,
-                "price": m["price"],
-                "currency": info.get("currency", "USD"),
-                "sma50": m["sma50"],
-                "sma200": m["sma200"],
-                "rsi": m["rsi"],
-                "mom3m": m["mom3m"],
-                "forwardPE": round(info["forwardPE"], 1) if info.get("forwardPE") else None,
-                "revGrowth": round(info["revenueGrowth"] * 100, 1) if info.get("revenueGrowth") else None,
-                "history": chart_points,
+                "name": info.get("shortName") or info.

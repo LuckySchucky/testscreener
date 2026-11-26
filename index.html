@@ -37,7 +37,7 @@
     }
 
     .container {
-      max-width: 1440px;
+      max-width: 1460px;
       margin: 0 auto;
       padding: 24px 20px;
     }
@@ -244,8 +244,8 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 12px 14px;
-      margin-bottom: 12px;
+      padding: 11px 14px;
+      margin-bottom: 10px;
     }
 
     .slider-box:last-child {
@@ -256,7 +256,7 @@
       display: flex;
       justify-content: space-between;
       font-size: 13px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .slider-val {
@@ -285,13 +285,20 @@
       margin-bottom: 16px;
     }
 
+    .toolbar-left {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
     .search-input {
       background: var(--bg-surface);
       border: 1px solid var(--border);
       color: var(--text-primary);
       padding: 10px 16px;
       border-radius: 12px;
-      width: 340px;
+      width: 320px;
       max-width: 100%;
       font-size: 14px;
       outline: none;
@@ -299,6 +306,24 @@
 
     .search-input:focus {
       border-color: var(--accent);
+    }
+
+    .toggle-chip {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 9px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-chip.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: #6ee7b7;
+      font-weight: 600;
     }
 
     .btn-reset {
@@ -331,7 +356,7 @@
     }
 
     th {
-      padding: 13px 14px;
+      padding: 13px 13px;
       font-size: 11.5px;
       font-weight: 600;
       text-transform: uppercase;
@@ -348,7 +373,7 @@
     }
 
     td {
-      padding: 13px 14px;
+      padding: 13px 13px;
       border-bottom: 1px solid rgba(38, 51, 77, 0.5);
       white-space: nowrap;
     }
@@ -424,7 +449,7 @@
     }
 
     .score-bar {
-      width: 52px;
+      width: 50px;
       height: 6px;
       background: #1e293b;
       border-radius: 999px;
@@ -452,7 +477,6 @@
       background: var(--accent);
     }
 
-    /* Modals */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -473,7 +497,7 @@
       background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 18px;
-      max-width: 700px;
+      max-width: 720px;
       width: 100%;
       padding: 24px;
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
@@ -528,7 +552,7 @@
     }
 
     .metric-item strong {
-      font-size: 16px;
+      font-size: 15.5px;
       color: var(--text-primary);
     }
 
@@ -569,7 +593,7 @@
         <div class="brand-logo">AP</div>
         <div>
           <h1>AlphaPulse Market Scanner</h1>
-          <p>Automatisierte Trend-, Momentum- &amp; Fundamental-Analyse</p>
+          <p>Automatisierte Trend-, Relative-Stärke- &amp; Fundamental-Analyse</p>
         </div>
       </div>
       <div class="header-actions">
@@ -647,24 +671,30 @@
 
         <div class="slider-box">
           <div class="slider-header">
-            <span>Mindest-Chance (1–5)</span>
-            <span class="slider-val" id="chanceLabel">ab 1</span>
+            <span>Mindest-Chance &amp; Max. Risiko</span>
+            <span class="slider-val" id="chanceRiskLabel">Chance ≥ 1 · Risiko ≤ 5</span>
           </div>
-          <input type="range" id="chanceMin" min="1" max="5" value="1" />
+          <div class="range-row">
+            <input type="range" id="chanceMin" min="1" max="5" value="1" />
+            <input type="range" id="riskMax" min="1" max="5" value="5" />
+          </div>
         </div>
 
         <div class="slider-box">
           <div class="slider-header">
-            <span>Max. Risiko-Stufe (1–5)</span>
-            <span class="slider-val" id="riskMaxLabel">bis 5</span>
+            <span>Mindest-Volumen (20T Ø Aktien/Tag)</span>
+            <span class="slider-val" id="volLabel">alle</span>
           </div>
-          <input type="range" id="riskMax" min="1" max="5" value="5" />
+          <input type="range" id="volMin" min="0" max="5000000" step="100000" value="0" />
         </div>
       </div>
     </section>
 
     <div class="toolbar">
-      <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Name, Ticker, Strategie, Land..." />
+      <div class="toolbar-left">
+        <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Name, Ticker, Strategie, Land..." />
+        <button class="toggle-chip" id="outperformToggle">Nur Outperformer (RS 3M &gt; 0)</button>
+      </div>
       <button class="btn-reset" id="resetBtn">Filter zurücksetzen</button>
     </div>
 
@@ -677,12 +707,12 @@
             <th data-sort="rating">Signal ↕</th>
             <th data-sort="status">Phase ↕</th>
             <th data-sort="chance">Chance ↕</th>
-            <th data-sort="risk">Risiko ↕</th>
             <th data-sort="tech_score">Tech ↕</th>
             <th data-sort="funda_score">Funda ↕</th>
             <th data-sort="mom3m">3M % ↕</th>
+            <th data-sort="rs3m">RS 3M ↕</th>
+            <th data-sort="distHighPct">52W Hoch ↕</th>
             <th data-sort="rsi">RSI ↕</th>
-            <th data-sort="strategy">Strategie ↕</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -700,7 +730,7 @@
         </div>
         <button class="modal-close" id="modalClose">✕</button>
       </div>
-      <canvas id="priceChart" width="640" height="170"></canvas>
+      <canvas id="priceChart" width="660" height="170"></canvas>
       <div class="metrics-grid" id="mMetrics"></div>
     </div>
   </div>
@@ -717,16 +747,16 @@
       </div>
       <div class="guide-list">
         <div class="guide-step">
-          <h3>1. Signal &amp; Strategie eingrenzen</h3>
-          <p>Starte links mit einem Klick auf <strong>kaufen</strong> oder <strong>Turnaround</strong> bzw. <strong>Wachstum</strong>. Mehrere Pills lassen sich kombinieren.</p>
+          <h3>1. Signal, Strategie &amp; Outperformer eingrenzen</h3>
+          <p>Starte mit <strong>kaufen</strong> oder <strong>Turnaround</strong> und aktiviere bei Bedarf <strong>Nur Outperformer (RS 3M &gt; 0)</strong>, um Werte zu finden, die den S&amp;P 500 über 3 Monate schlagen.</p>
         </div>
         <div class="guide-step">
-          <h3>2. Scores, 3M-Momentum &amp; Risiko abgleichen</h3>
-          <p>Nutze rechts die Regler für <strong>Tech</strong>, <strong>Funda</strong>, <strong>Chance</strong> und <strong>Risiko</strong>. In der Tabelle zeigen <strong>3M %</strong> das Quartals-Momentum und <strong>RSI</strong> die kurzfristige Spannung (unter 30 eher überverkauft, über 70 eher heißgelaufen).</p>
+          <h3>2. Scores, 52W-Abstand &amp; Liquidität prüfen</h3>
+          <p><strong>52W Hoch</strong> zeigt den Abstand zum Jahreshoch (nahe 0 % = Ausbruchsnähe, stark negativ = Rebound-Kandidat). Mit dem <strong>Volumen-Regler</strong> filterst du dünn gehandelte Nebenwerte heraus.</p>
         </div>
         <div class="guide-step">
-          <h3>3. Spalten sortieren &amp; Detailansicht öffnen</h3>
-          <p>Klicke auf eine Tabellenüberschrift zum Sortieren und auf eine Zeile, um Kursverlauf, SMA 50/200, Forward KGV und Umsatzwachstum im Detail zu sehen.</p>
+          <h3>3. Sortieren &amp; Detailansicht öffnen</h3>
+          <p>Klicke auf eine Tabellenüberschrift zum Sortieren und auf eine Zeile, um Chart, SMA 50/200, RS 3M, Durchschnittsvolumen, Forward KGV und Umsatzwachstum im Detail zu sehen.</p>
         </div>
       </div>
     </div>
@@ -738,6 +768,7 @@
     let selectedStrategies = new Set();
     let selectedStatuses = new Set();
     let selectedTags = new Set();
+    let onlyOutperformers = false;
     let sortKey = 'tech_score';
     let sortAsc = false;
 
@@ -759,6 +790,13 @@
       return Number.isFinite(val) ? Math.max(0, Math.min(100, val)) : 0;
     }
 
+    function formatVol(v) {
+      if (!v || v <= 0) return '—';
+      if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + ' Mio.';
+      if (v >= 1_000) return Math.round(v / 1_000) + ' Tsd.';
+      return String(v);
+    }
+
     function showError(msg) {
       const box = document.getElementById('errorBox');
       box.style.display = 'block';
@@ -771,7 +809,10 @@
       const risk = Number(s.risk ?? 3);
       const priceNum = Number(s.price);
       const momNum = Number(s.mom3m);
+      const rsNum = Number(s.rs3m);
+      const distNum = Number(s.distHighPct);
       const rsiNum = Number(s.rsi);
+      const volNum = Number(s.avgVolume ?? 0);
       return {
         name: String(s.name || s.ticker || 'Unbekannt'),
         ticker: String(s.ticker || ''),
@@ -790,8 +831,12 @@
         currency: String(s.currency || ''),
         sma50: s.sma50 ?? '—',
         sma200: s.sma200 ?? '—',
+        high52w: s.high52w ?? '—',
+        distHighPct: s.distHighPct != null && Number.isFinite(distNum) ? distNum : null,
         rsi: s.rsi != null && Number.isFinite(rsiNum) ? rsiNum : null,
         mom3m: s.mom3m != null && Number.isFinite(momNum) ? momNum : null,
+        rs3m: s.rs3m != null && Number.isFinite(rsNum) ? rsNum : null,
+        avgVolume: Number.isFinite(volNum) ? volNum : 0,
         forwardPE: s.forwardPE ?? '—',
         revGrowth: s.revGrowth ?? null,
         history: Array.isArray(s.history) ? s.history.map(Number).filter(Number.isFinite) : []
@@ -809,8 +854,8 @@
         const json = JSON.parse(text);
         const rawList = Array.isArray(json.stocks) ? json.stocks : (Array.isArray(json) ? json : []);
         allStocks = rawList.map(normalizeStock).filter(Boolean);
-        const wText = json.weights ? ` · Gewichtung ${Math.round((json.weights.tech ?? 0.6) * 100)}/${Math.round((json.weights.funda ?? 0.4) * 100)}` : '';
-        statusEl.textContent = 'Stand: ' + (json.updated_at || 'Aktuell') + ` · ${allStocks.length} Werte` + wText;
+        const benchText = json.benchmark_mom3m != null ? ` · S&P 3M: ${json.benchmark_mom3m > 0 ? '+' : ''}${json.benchmark_mom3m}%` : '';
+        statusEl.textContent = 'Stand: ' + (json.updated_at || 'Aktuell') + ` · ${allStocks.length} Werte` + benchText;
         if (!allStocks.length) {
           showError('Die data.json wurde geladen, enthält aber aktuell keine Einträge.');
         }
@@ -876,11 +921,12 @@
       const fMax = Math.max(+document.getElementById('fundaMin').value, +document.getElementById('fundaMax').value);
       const cMin = +document.getElementById('chanceMin').value;
       const rMax = +document.getElementById('riskMax').value;
+      const vMin = +document.getElementById('volMin').value;
 
       document.getElementById('techRangeLabel').textContent = `${tMin} – ${tMax}`;
       document.getElementById('fundaRangeLabel').textContent = `${fMin} – ${fMax}`;
-      document.getElementById('chanceLabel').textContent = `ab ${cMin}`;
-      document.getElementById('riskMaxLabel').textContent = `bis ${rMax}`;
+      document.getElementById('chanceRiskLabel').textContent = `Chance ≥ ${cMin} · Risiko ≤ ${rMax}`;
+      document.getElementById('volLabel').textContent = vMin > 0 ? `ab ${formatVol(vMin)}` : 'alle';
 
       let filtered = allStocks.filter(s => {
         const tech = getTechScore(s);
@@ -889,10 +935,12 @@
         if (selectedStrategies.size && !selectedStrategies.has(s.strategy)) return false;
         if (selectedStatuses.size && !selectedStatuses.has(s.status)) return false;
         if (selectedTags.size && !selectedTags.has(s.tag)) return false;
+        if (onlyOutperformers && (s.rs3m == null || s.rs3m <= 0)) return false;
         if (tech < tMin || tech > tMax) return false;
         if (funda < fMin || funda > fMax) return false;
         if (s.chance < cMin) return false;
         if (s.risk > rMax) return false;
+        if (vMin > 0 && s.avgVolume < vMin) return false;
         if (q) {
           const hay = `${s.name} ${s.ticker} ${s.isin} ${s.country} ${s.sector} ${s.strategy} ${s.tag}`.toLowerCase();
           if (!hay.includes(q)) return false;
@@ -901,8 +949,8 @@
       });
 
       filtered.sort((a, b) => {
-        const v1 = sortKey === 'tech_score' ? getTechScore(a) : (sortKey === 'funda_score' ? getFundaScore(a) : (a[sortKey] ?? ''));
-        const v2 = sortKey === 'tech_score' ? getTechScore(b) : (sortKey === 'funda_score' ? getFundaScore(b) : (b[sortKey] ?? ''));
+        const v1 = sortKey === 'tech_score' ? getTechScore(a) : (sortKey === 'funda_score' ? getFundaScore(a) : (a[sortKey] ?? -999999));
+        const v2 = sortKey === 'tech_score' ? getTechScore(b) : (sortKey === 'funda_score' ? getFundaScore(b) : (b[sortKey] ?? -999999));
         if (typeof v1 === 'number' && typeof v2 === 'number') {
           return sortAsc ? v1 - v2 : v2 - v1;
         }
@@ -924,6 +972,9 @@
         const dots = [1, 2, 3, 4, 5].map(i => `<span class="dot ${i <= s.chance ? 'filled' : ''}"></span>`).join('');
         const momCls = s.mom3m != null ? (s.mom3m >= 0 ? 'pos-val' : 'neg-val') : '';
         const momText = s.mom3m != null ? `${s.mom3m > 0 ? '+' : ''}${s.mom3m}%` : '—';
+        const rsCls = s.rs3m != null ? (s.rs3m >= 0 ? 'pos-val' : 'neg-val') : '';
+        const rsText = s.rs3m != null ? `${s.rs3m > 0 ? '+' : ''}${s.rs3m}%` : '—';
+        const distText = s.distHighPct != null ? `${s.distHighPct}%` : '—';
         return `
           <tr data-idx="${idx}">
             <td>
@@ -934,7 +985,6 @@
             <td><span class="badge ${badgeCls}">${s.rating}</span></td>
             <td><span class="status-chip">${s.status}</span></td>
             <td><div class="chance-dots">${dots}</div></td>
-            <td><strong>${s.risk}/5</strong></td>
             <td>
               <div class="score-bar-wrap">
                 <div class="score-bar"><div class="score-fill" style="width:${tech}%"></div></div>
@@ -948,8 +998,9 @@
               </div>
             </td>
             <td><span class="${momCls}">${momText}</span></td>
+            <td><span class="${rsCls}">${rsText}</span></td>
+            <td>${distText}</td>
             <td>${s.rsi != null ? s.rsi : '—'}</td>
-            <td>${s.strategy}</td>
           </tr>
         `;
       }).join('');
@@ -969,8 +1020,11 @@
         <div class="metric-item"><span>Aktueller Kurs</span><strong>${s.price ?? '—'} ${s.currency}</strong></div>
         <div class="metric-item"><span>Tech / Funda Score</span><strong>${tech} / ${funda}</strong></div>
         <div class="metric-item"><span>Chance / Risiko</span><strong>${s.chance}/5 · Risiko ${s.risk}/5</strong></div>
-        <div class="metric-item"><span>RSI (14) &amp; 3M-Momentum</span><strong>${s.rsi ?? '—'} / ${s.mom3m != null ? s.mom3m + '%' : '—'}</strong></div>
+        <div class="metric-item"><span>3M-Mom. / RS vs. S&amp;P</span><strong>${s.mom3m != null ? s.mom3m + '%' : '—'} / ${s.rs3m != null ? (s.rs3m > 0 ? '+' : '') + s.rs3m + '%' : '—'}</strong></div>
+        <div class="metric-item"><span>52W Hoch / Abstand</span><strong>${s.high52w} (${s.distHighPct != null ? s.distHighPct + '%' : '—'})</strong></div>
         <div class="metric-item"><span>SMA 50 / SMA 200</span><strong>${s.sma50} / ${s.sma200}</strong></div>
+        <div class="metric-item"><span>RSI (14)</span><strong>${s.rsi ?? '—'}</strong></div>
+        <div class="metric-item"><span>Ø Volumen (20 Tage)</span><strong>${formatVol(s.avgVolume)}</strong></div>
         <div class="metric-item"><span>Forward KGV / Umsatz %</span><strong>${s.forwardPE} / ${s.revGrowth != null ? s.revGrowth + '%' : '—'}</strong></div>
       `;
       document.getElementById('modalBackdrop').classList.add('open');
@@ -1012,7 +1066,14 @@
       if (e.target.id === 'guideBackdrop') document.getElementById('guideBackdrop').classList.remove('open');
     };
 
-    ['searchInput', 'techMin', 'techMax', 'fundaMin', 'fundaMax', 'chanceMin', 'riskMax'].forEach(id => {
+    const outBtn = document.getElementById('outperformToggle');
+    outBtn.addEventListener('click', () => {
+      onlyOutperformers = !onlyOutperformers;
+      outBtn.classList.toggle('active', onlyOutperformers);
+      render();
+    });
+
+    ['searchInput', 'techMin', 'techMax', 'fundaMin', 'fundaMax', 'chanceMin', 'riskMax', 'volMin'].forEach(id => {
       document.getElementById(id).addEventListener('input', render);
     });
 
@@ -1030,6 +1091,8 @@
       selectedStrategies.clear();
       selectedStatuses.clear();
       selectedTags.clear();
+      onlyOutperformers = false;
+      outBtn.classList.remove('active');
       document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
       document.getElementById('searchInput').value = '';
       document.getElementById('techMin').value = 0;
@@ -1038,6 +1101,7 @@
       document.getElementById('fundaMax').value = 100;
       document.getElementById('chanceMin').value = 1;
       document.getElementById('riskMax').value = 5;
+      document.getElementById('volMin').value = 0;
       render();
     });
 

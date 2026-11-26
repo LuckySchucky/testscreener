@@ -1,0 +1,1944 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WLA Aktien-Screener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            wla: {
+              bg: '#121214',
+              surface: '#18181b',
+              panel: '#1f1f23',
+              border: '#2c2c32',
+              hover: '#25252a',
+              gold: '#eab308',
+              amber: '#f59e0b',
+              goldDim: 'rgba(234, 179, 8, 0.14)',
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      background-color: #121214;
+      color: #f4f4f5;
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #121214;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2c2c32;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3f3f46;
+    }
+
+    /* Dual Range Slider Styling */
+    .dual-range-wrap {
+      position: relative;
+      height: 24px;
+      display: flex;
+      align-items: center;
+    }
+    .dual-range-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background-color: #2e2e34;
+      border-radius: 9999px;
+    }
+    .dual-range-fill {
+      position: absolute;
+      height: 4px;
+      background: linear-gradient(90deg, #f59e0b, #eab308);
+      border-radius: 9999px;
+      box-shadow: 0 0 8px rgba(234, 179, 8, 0.35);
+    }
+    .dual-range-input {
+      position: absolute;
+      width: 100%;
+      pointer-events: none;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      margin: 0;
+      z-index: 2;
+    }
+    .dual-range-input::-webkit-slider-thumb {
+      pointer-events: auto;
+      appearance: none;
+      -webkit-appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #eab308;
+      border: 2px solid #18181b;
+      box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.45);
+      cursor: pointer;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+    .dual-range-input::-webkit-slider-thumb:hover {
+      transform: scale(1.18);
+      background: #facc15;
+    }
+    .dual-range-input::-moz-range-thumb {
+      pointer-events: auto;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #eab308;
+      border: 2px solid #18181b;
+      box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.45);
+      cursor: pointer;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-yellow-500/30 selection:text-yellow-200">
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-30 bg-[#141417]/95 backdrop-blur border-b border-[#26262b]">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center text-zinc-950 font-bold text-sm shadow-md shadow-yellow-500/20">
+          WLA
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="font-semibold text-sm sm:text-base tracking-tight text-white">Wir Lieben Aktien</span>
+          <span class="hidden sm:inline-block text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/70">Screener Pro</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 text-xs">
+        <span class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 font-medium">
+          <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></span>
+          WLA-System aktiv
+        </span>
+        <button id="toggleFilterBtn" class="px-3 py-1.5 rounded-lg bg-[#1f1f23] hover:bg-[#28282d] border border-[#2f2f36] text-zinc-200 font-medium transition flex items-center gap-1.5">
+          <svg id="filterChevron" class="w-3.5 h-3.5 text-yellow-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+          <span>Filter ausblenden</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+    <!-- Page Title & Quick Search Header -->
+    <section class="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3 flex-wrap">
+          <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-white">Aktien-Screener</h1>
+          <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-[#1f1f23] text-zinc-300 border border-[#2c2c32]">
+            Letzte Änderung: Heute, 14:20 • 320 Aktien im Universum
+          </span>
+        </div>
+        <p class="text-xs sm:text-sm text-zinc-400 mt-1">
+          Systematische Chancensuche nach technischem (WLATAR) und fundamentalem (WLAFAR) Rating.
+        </p>
+      </div>
+
+      <!-- Search & Reset Controls -->
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+        <button id="resetFiltersBtn" class="px-3.5 py-2 rounded-full bg-[#1f1f23] hover:bg-[#29292f] text-zinc-300 hover:text-white border border-[#2f2f36] text-xs font-medium transition flex items-center justify-center gap-1.5 shrink-0">
+          <svg class="w-3.5 h-3.5 text-zinc-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span id="resetLabel">Filter zurücksetzen</span>
+        </button>
+
+        <div class="relative w-full sm:w-80">
+          <svg class="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+          </svg>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Name, Ticker, ISIN oder WKN"
+            class="w-full pl-9 pr-8 py-2 rounded-full bg-[#1f1f23] border border-[#2f2f36] focus:border-yellow-500/70 focus:outline-none text-xs sm:text-sm text-white placeholder-zinc-500 transition"
+          />
+          <button id="clearSearchBtn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white text-xs">
+            ✕
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Collapsible WLA-BEWERTUNG Filter Panel -->
+    <section id="filterPanel" class="bg-[#18181b] border border-[#27272d] rounded-2xl p-4 sm:p-6 shadow-xl shadow-black/30 transition-all">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Strategie & Quick Presets (4 cols) -->
+        <div class="lg:col-span-4 space-y-5 lg:border-r lg:border-[#26262c] lg:pr-6">
+          <div>
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Strategie</span>
+              <span class="text-[11px] text-zinc-500">Anlagestil</span>
+            </div>
+            <div id="strategyPills" class="flex flex-wrap gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-2.5">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Depot- & Trend-Tags</span>
+              <span class="text-[11px] text-zinc-500">Fokuslisten</span>
+            </div>
+            <div id="tagPills" class="flex flex-wrap gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <div class="pt-2 border-t border-[#26262c]">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400 block mb-2.5">Schnell-Setups (WLA-Chancen)</span>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
+              <button data-preset="top-chancen" class="preset-btn text-left px-3 py-2 rounded-xl bg-[#1f1f23] hover:bg-[#26262b] border border-[#2e2e34] transition flex items-center justify-between group">
+                <div>
+                  <div class="text-xs font-semibold text-zinc-200 group-hover:text-yellow-400 transition">Top-Chancen (Kaufen & Boden)</div>
+                  <div class="text-[11px] text-zinc-500">Rating: kaufen • Status: Bodenbildung / abwarten</div>
+                </div>
+                <span class="text-yellow-400 text-xs font-bold">→</span>
+              </button>
+              <button data-preset="high-conviction" class="preset-btn text-left px-3 py-2 rounded-xl bg-[#1f1f23] hover:bg-[#26262b] border border-[#2e2e34] transition flex items-center justify-between group">
+                <div>
+                  <div class="text-xs font-semibold text-zinc-200 group-hover:text-yellow-400 transition">Starkes Gesamt-Rating (4–5 Balken)</div>
+                  <div class="text-[11px] text-zinc-500">Chance ≥ 4 • WLATAR & WLAFAR ≥ 65</div>
+                </div>
+                <span class="text-yellow-400 text-xs font-bold">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: WLA-BEWERTUNG (8 cols) -->
+        <div class="lg:col-span-8 space-y-5">
+          <div class="flex items-center justify-between border-b border-[#26262c] pb-2.5">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+              WLA-BEWERTUNG
+            </h2>
+            <span class="text-[11px] text-zinc-400">Mehrfachauswahl möglich</span>
+          </div>
+
+          <!-- Rating Pills -->
+          <div>
+            <label class="block text-xs font-semibold text-zinc-300 mb-2">Rating</label>
+            <div id="ratingPills" class="flex flex-wrap gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Status Pills -->
+          <div>
+            <label class="block text-xs font-semibold text-zinc-300 mb-2">Status</label>
+            <div id="statusPills" class="flex flex-wrap gap-2">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Dual Range Sliders Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 pt-1">
+            <!-- Chance Slider -->
+            <div class="bg-[#1f1f23]/70 border border-[#2a2a30] rounded-xl p-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-zinc-200">Chance</span>
+                <span id="chanceRangeText" class="text-xs font-medium text-yellow-400">egal</span>
+              </div>
+              <div class="dual-range-wrap" data-slider="chance">
+                <div class="dual-range-track"></div>
+                <div id="chanceFill" class="dual-range-fill"></div>
+                <input id="chanceMin" type="range" min="1" max="5" step="1" value="1" class="dual-range-input" />
+                <input id="chanceMax" type="range" min="1" max="5" step="1" value="5" class="dual-range-input" />
+              </div>
+              <div class="flex justify-between text-[10px] text-zinc-500 mt-1 px-0.5">
+                <span>1 Balken</span>
+                <span>2</span>
+                <span>3</span>
+                <span>4</span>
+                <span>5 Balken</span>
+              </div>
+            </div>
+
+            <!-- Risiko Slider -->
+            <div class="bg-[#1f1f23]/70 border border-[#2a2a30] rounded-xl p-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-zinc-200">Risiko</span>
+                <span id="risikoRangeText" class="text-xs font-medium text-yellow-400">egal</span>
+              </div>
+              <div class="dual-range-wrap" data-slider="risiko">
+                <div class="dual-range-track"></div>
+                <div id="risikoFill" class="dual-range-fill"></div>
+                <input id="risikoMin" type="range" min="1" max="5" step="1" value="1" class="dual-range-input" />
+                <input id="risikoMax" type="range" min="1" max="5" step="1" value="5" class="dual-range-input" />
+              </div>
+              <div class="flex justify-between text-[10px] text-zinc-500 mt-1 px-0.5">
+                <span>1 (gering)</span>
+                <span>2</span>
+                <span>3</span>
+                <span>4</span>
+                <span>5 (hoch)</span>
+              </div>
+            </div>
+
+            <!-- WLATAR Slider -->
+            <div class="bg-[#1f1f23]/70 border border-[#2a2a30] rounded-xl p-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-zinc-200" title="WLA Technisches Aktien-Rating">WLATAR <span class="text-zinc-500 font-normal">(Technisch)</span></span>
+                <span id="wlatarRangeText" class="text-xs font-medium text-yellow-400">egal</span>
+              </div>
+              <div class="dual-range-wrap" data-slider="wlatar">
+                <div class="dual-range-track"></div>
+                <div id="wlatarFill" class="dual-range-fill"></div>
+                <input id="wlatarMin" type="range" min="0" max="100" step="5" value="0" class="dual-range-input" />
+                <input id="wlatarMax" type="range" min="0" max="100" step="5" value="100" class="dual-range-input" />
+              </div>
+              <div class="flex justify-between text-[10px] text-zinc-500 mt-1 px-0.5">
+                <span>0</span>
+                <span>25</span>
+                <span>50</span>
+                <span>75</span>
+                <span>100</span>
+              </div>
+            </div>
+
+            <!-- WLAFAR Slider -->
+            <div class="bg-[#1f1f23]/70 border border-[#2a2a30] rounded-xl p-3">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-xs font-semibold text-zinc-200" title="WLA Fundamentales Aktien-Rating">WLAFAR <span class="text-zinc-500 font-normal">(Fundamental)</span></span>
+                <span id="wlafarRangeText" class="text-xs font-medium text-yellow-400">egal</span>
+              </div>
+              <div class="dual-range-wrap" data-slider="wlafar">
+                <div class="dual-range-track"></div>
+                <div id="wlafarFill" class="dual-range-fill"></div>
+                <input id="wlafarMin" type="range" min="0" max="100" step="5" value="0" class="dual-range-input" />
+                <input id="wlafarMax" type="range" min="0" max="100" step="5" value="100" class="dual-range-input" />
+              </div>
+              <div class="flex justify-between text-[10px] text-zinc-500 mt-1 px-0.5">
+                <span>0</span>
+                <span>25</span>
+                <span>50</span>
+                <span>75</span>
+                <span>100</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Results Counter & Active Filter Chips -->
+    <section class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-1">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span id="resultCountText" class="text-xs sm:text-sm font-medium text-zinc-300">
+          28 von 28 Aktien angezeigt (Universum: 320)
+        </span>
+        <div id="activeFilterSummary" class="flex flex-wrap gap-1.5"></div>
+      </div>
+
+      <div class="flex items-center gap-2 text-xs text-zinc-400">
+        <span>Sortierung:</span>
+        <select id="mobileSortSelect" class="bg-[#1f1f23] border border-[#2f2f36] rounded-lg px-2.5 py-1 text-zinc-200 focus:outline-none focus:border-yellow-500">
+          <option value="name-asc">Unternehmen (A–Z)</option>
+          <option value="chance-desc">Chance (hoch → niedrig)</option>
+          <option value="wlatar-desc">WLATAR (hoch → niedrig)</option>
+          <option value="wlafar-desc">WLAFAR (hoch → niedrig)</option>
+          <option value="risiko-asc">Risiko (niedrig → hoch)</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Stock Table Container -->
+    <section class="bg-[#18181b] border border-[#27272d] rounded-2xl overflow-hidden shadow-xl shadow-black/30">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[1040px]">
+          <thead>
+            <tr class="border-b border-[#27272d] bg-[#1c1c20] text-[11px] font-semibold uppercase tracking-wider text-zinc-400 select-none">
+              <th data-sort="name" class="sort-header py-3.5 px-4 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Unternehmen</span>
+                  <span class="sort-icon text-yellow-400">▲</span>
+                </div>
+              </th>
+              <th data-sort="strategie" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Strategie</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="status" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Status</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="chance" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Chance</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="risiko" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Risiko</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="wlatar" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition text-center">
+                <div class="flex items-center justify-center gap-1">
+                  <span>WLATAR</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="wlafar" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition text-center">
+                <div class="flex items-center justify-center gap-1">
+                  <span>WLAFAR</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="rating" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Rating</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="land" class="sort-header py-3.5 px-3 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Land</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+              <th data-sort="branche" class="sort-header py-3.5 px-4 cursor-pointer hover:text-white transition">
+                <div class="flex items-center gap-1">
+                  <span>Branche</span>
+                  <span class="sort-icon text-zinc-600">⇅</span>
+                </div>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="stockTableBody" class="divide-y divide-[#24242a] text-sm">
+            <!-- Rows injected via JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-14 px-4 text-center">
+        <div class="w-12 h-12 rounded-full bg-[#1f1f23] border border-[#2f2f36] flex items-center justify-center mx-auto mb-3 text-yellow-400">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+          </svg>
+        </div>
+        <h3 class="text-base font-semibold text-white">Keine passenden Aktien gefunden</h3>
+        <p class="text-xs text-zinc-400 mt-1 max-w-md mx-auto">
+          Für deine aktuelle Kombination aus Rating, Status und Kennzahlen-Slidern liegen keine Treffer vor.
+        </p>
+        <button id="emptyResetBtn" class="mt-4 px-4 py-2 rounded-full bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-semibold text-xs transition">
+          Alle Filter zurücksetzen
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Stock Detail Modal / Drawer -->
+  <div id="detailModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-3 sm:p-6">
+    <div class="bg-[#18181b] border border-[#2e2e36] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl animate-[fadeIn_0.15s_ease-out]">
+      <!-- Modal Header -->
+      <div class="sticky top-0 z-10 bg-[#18181b]/95 backdrop-blur border-b border-[#27272d] px-5 py-4 flex items-start justify-between gap-4">
+        <div>
+          <div id="modalTags" class="flex flex-wrap gap-1.5 mb-1"></div>
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <h2 id="modalName" class="text-xl font-bold text-white">Unternehmen</h2>
+            <span id="modalTicker" class="text-xs font-mono px-2 py-0.5 rounded bg-[#232329] text-zinc-300 border border-[#32323a]">TICKER</span>
+            <span id="modalWkn" class="text-xs text-zinc-400">WKN: —</span>
+          </div>
+          <p id="modalMeta" class="text-xs text-zinc-400 mt-0.5">Land • Branche • ISIN</p>
+        </div>
+        <button id="closeModalBtn" class="w-8 h-8 rounded-full bg-[#232329] hover:bg-[#2f2f37] text-zinc-300 hover:text-white flex items-center justify-center transition shrink-0">
+          ✕
+        </button>
+      </div>
+
+      <!-- Modal Content -->
+      <div class="p-5 space-y-6">
+        <!-- Key Rating Banner -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-3">
+            <div class="text-[11px] text-zinc-400">WLA Rating</div>
+            <div id="modalRating" class="text-base font-bold mt-1">↑ kaufen</div>
+          </div>
+          <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-3">
+            <div class="text-[11px] text-zinc-400">Technischer Status</div>
+            <div id="modalStatus" class="text-xs font-semibold text-yellow-400 mt-1.5">Bodenbildung</div>
+          </div>
+          <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-3">
+            <div class="text-[11px] text-zinc-400">Chance / Risiko</div>
+            <div class="flex items-center gap-3 mt-1.5">
+              <div id="modalChanceBars" class="flex items-center gap-1"></div>
+              <span id="modalRisikoText" class="text-xs text-zinc-400">Risiko: 2/5</span>
+            </div>
+          </div>
+          <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-3">
+            <div class="text-[11px] text-zinc-400">Strategie</div>
+            <div id="modalStrategie" class="text-sm font-semibold text-white mt-1">Wachstum</div>
+          </div>
+        </div>
+
+        <!-- Simulated Price Chart (SVG) -->
+        <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <div class="text-xs font-semibold text-zinc-200">Kursverlauf & WLA-Trendkanal (12 Monate, simuliert)</div>
+              <div id="modalPriceHeadline" class="text-lg font-bold text-white mt-0.5">142,80 € <span class="text-xs font-medium text-emerald-400">+14,2 %</span></div>
+            </div>
+            <div class="flex items-center gap-3 text-[11px] text-zinc-400">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-0.5 bg-yellow-400 inline-block"></span> Kurs</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-0.5 bg-zinc-500 border-dashed inline-block"></span> Fair-Value-Zone</span>
+            </div>
+          </div>
+          <div id="modalChartContainer" class="w-full h-48"></div>
+        </div>
+
+        <!-- WLATAR & WLAFAR Breakdown -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-zinc-300">WLATAR (Technisch)</span>
+              <span id="modalWlatarScore" class="text-sm font-bold text-yellow-400">82 / 100</span>
+            </div>
+            <div class="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div id="modalWlatarBar" class="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full" style="width: 82%"></div>
+            </div>
+            <p id="modalTechNote" class="text-xs text-zinc-400 leading-relaxed">
+              Übergeordneter Aufwärtstrend intakt; Rücksetzer an die Unterstützungszone bietet attraktives Chance-Risiko-Verhältnis.
+            </p>
+          </div>
+
+          <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-zinc-300">WLAFAR (Fundamental)</span>
+              <span id="modalWlafarScore" class="text-sm font-bold text-yellow-400">78 / 100</span>
+            </div>
+            <div class="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+              <div id="modalWlafarBar" class="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full" style="width: 78%"></div>
+            </div>
+            <p id="modalFundNote" class="text-xs text-zinc-400 leading-relaxed">
+              Solide Margenentwicklung, verlässlicher Free-Cashflow und überdurchschnittliche Kapitalrendite im Branchenvergleich.
+            </p>
+          </div>
+        </div>
+
+        <!-- Fundamental Key Metrics -->
+        <div class="bg-[#1f1f23] border border-[#2c2c33] rounded-xl p-4">
+          <div class="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">Fundamentaldaten & Kennzahlen</div>
+          <div id="modalFundamentals" class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Realistic WLA Aktien-Screener Dataset (28 Stocks)
+     * Includes stocks visible in the reference screenshots plus major European/US/Asian titles.
+     */
+    const STOCKS = [
+      {
+        id: 1,
+        name: "3D Systems",
+        ticker: "DDD",
+        wkn: "888346",
+        isin: "US88554D2053",
+        strategie: "Wachstum",
+        status: "Boden abwarten",
+        chance: 3,
+        risiko: 4,
+        wlatar: 48,
+        wlafar: 42,
+        rating: "halten",
+        land: "USA",
+        branche: "Informationstechnologie",
+        tags: [],
+        price: "3,42 $",
+        change: "-4,8 %",
+        kgv: "—",
+        divRendite: "0,0 %",
+        umsatzWachstum: "+2,4 %",
+        marge: "38,1 %",
+        chart: [4.2, 4.0, 3.8, 3.9, 3.6, 3.5, 3.3, 3.2, 3.35, 3.4, 3.38, 3.42]
+      },
+      {
+        id: 2,
+        name: "3M",
+        ticker: "MMM",
+        wkn: "851745",
+        isin: "US88579Y1010",
+        strategie: "Cashflow",
+        status: "Position verwalten",
+        chance: 3,
+        risiko: 2,
+        wlatar: 64,
+        wlafar: 68,
+        rating: "halten",
+        land: "USA",
+        branche: "Industrie",
+        tags: [],
+        price: "134,50 $",
+        change: "+18,6 %",
+        kgv: "17,4",
+        divRendite: "2,1 %",
+        umsatzWachstum: "+3,1 %",
+        marge: "21,8 %",
+        chart: [112, 115, 118, 121, 125, 123, 128, 130, 132, 131, 133, 134.5]
+      },
+      {
+        id: 3,
+        name: "4imprint",
+        ticker: "FOUR",
+        wkn: "A0BL5N",
+        isin: "GB0006640972",
+        strategie: "Cashflow",
+        status: "Regression abwarten",
+        chance: 4,
+        risiko: 2,
+        wlatar: 71,
+        wlafar: 84,
+        rating: "halten",
+        land: "Großbritannien",
+        branche: "Nicht-Basiskonsumgüter",
+        tags: [],
+        price: "54,20 £",
+        change: "+9,4 %",
+        kgv: "16,8",
+        divRendite: "3,2 %",
+        umsatzWachstum: "+8,7 %",
+        marge: "11,4 %",
+        chart: [49, 50, 52, 55, 57, 56, 54, 53, 55, 56, 54.8, 54.2]
+      },
+      {
+        id: 4,
+        name: "7C Solarparken",
+        ticker: "HRPK",
+        wkn: "A11QW6",
+        isin: "DE000A11QW68",
+        strategie: "Cashflow",
+        status: "Trendbruch",
+        chance: 2,
+        risiko: 4,
+        wlatar: 29,
+        wlafar: 51,
+        rating: "verkaufen",
+        land: "Deutschland",
+        branche: "Versorger",
+        tags: [],
+        price: "2,18 €",
+        change: "-22,4 %",
+        kgv: "19,2",
+        divRendite: "2,8 %",
+        umsatzWachstum: "-3,5 %",
+        marge: "68,0 %",
+        chart: [2.85, 2.75, 2.70, 2.60, 2.55, 2.48, 2.40, 2.35, 2.28, 2.24, 2.20, 2.18]
+      },
+      {
+        id: 5,
+        name: "AAK",
+        ticker: "AAK",
+        wkn: "A2N47E",
+        isin: "SE0011337708",
+        strategie: "Dividende",
+        status: "Bodenbildung",
+        chance: 4,
+        risiko: 2,
+        wlatar: 76,
+        wlafar: 81,
+        rating: "kaufen",
+        land: "Schweden",
+        branche: "Basiskonsumgüter",
+        tags: ["Mega-Trends 2026"],
+        price: "318,40 SEK",
+        change: "+12,1 %",
+        kgv: "21,5",
+        divRendite: "1,7 %",
+        umsatzWachstum: "+6,2 %",
+        marge: "10,9 %",
+        chart: [282, 286, 294, 301, 298, 305, 302, 308, 311, 314, 316, 318.4]
+      },
+      {
+        id: 6,
+        name: "Abbott Laboratories",
+        ticker: "ABT",
+        wkn: "850103",
+        isin: "US0028241000",
+        strategie: "Dividende",
+        status: "Bodenbildung",
+        chance: 4,
+        risiko: 1,
+        wlatar: 79,
+        wlafar: 85,
+        rating: "kaufen",
+        land: "USA",
+        branche: "Gesundheitswesen",
+        tags: [],
+        price: "118,90 $",
+        change: "+11,5 %",
+        kgv: "23,4",
+        divRendite: "1,9 %",
+        umsatzWachstum: "+7,4 %",
+        marge: "19,6 %",
+        chart: [106, 108, 107, 110, 112, 111, 114, 113, 115, 117, 118, 118.9]
+      },
+      {
+        id: 7,
+        name: "Accenture",
+        ticker: "ACN",
+        wkn: "A0YAQA",
+        isin: "IE00B4BNMY34",
+        strategie: "Dividende",
+        status: "Regression abwarten",
+        chance: 4,
+        risiko: 2,
+        wlatar: 66,
+        wlafar: 87,
+        rating: "halten",
+        land: "USA",
+        branche: "Informationstechnologie",
+        tags: [],
+        price: "356,20 $",
+        change: "+8,9 %",
+        kgv: "27,1",
+        divRendite: "1,6 %",
+        umsatzWachstum: "+5,8 %",
+        marge: "15,5 %",
+        chart: [325, 330, 342, 355, 368, 360, 352, 348, 351, 354, 355, 356.2]
+      },
+      {
+        id: 8,
+        name: "Adobe",
+        ticker: "ADBE",
+        wkn: "871981",
+        isin: "US00724F1012",
+        strategie: "Wachstum",
+        status: "Boden abwarten",
+        chance: 5,
+        risiko: 2,
+        wlatar: 83,
+        wlafar: 92,
+        rating: "kaufen",
+        land: "USA",
+        branche: "Informationstechnologie",
+        tags: ["Software-Crash", "Trump-Depot"],
+        price: "492,10 $",
+        change: "-6,2 %",
+        kgv: "24,8",
+        divRendite: "0,0 %",
+        umsatzWachstum: "+11,2 %",
+        marge: "36,4 %",
+        chart: [535, 548, 520, 495, 480, 472, 468, 475, 482, 486, 490, 492.1]
+      },
+      {
+        id: 9,
+        name: "Aemetis",
+        ticker: "AMTX",
+        wkn: "A1W42X",
+        isin: "US00770K2024",
+        strategie: "Wachstum",
+        status: "Turnaround",
+        chance: 4,
+        risiko: 5,
+        wlatar: 72,
+        wlafar: 44,
+        rating: "kaufen",
+        land: "USA",
+        branche: "Industrie",
+        tags: [],
+        price: "4,85 $",
+        change: "+24,0 %",
+        kgv: "—",
+        divRendite: "0,0 %",
+        umsatzWachstum: "+34,0 %",
+        marge: "8,2 %",
+        chart: [3.8, 3.6, 3.5, 3.7, 3.9, 4.1, 4.0, 4.3, 4.5, 4.6, 4.75, 4.85]
+      },
+      {
+        id: 10,
+        name: "Ahold Delhaize",
+        ticker: "AD",
+        wkn: "A2ANT0",
+        isin: "NL0011794037",
+        strategie: "Cashflow",
+        status: "Bodenbildung",
+        chance: 4,
+        risiko: 1,
+        wlatar: 81,
+        wlafar: 79,
+        rating: "kaufen",
+        land: "Niederlande",
+        branche: "Basiskonsumgüter",
+        tags: ["Mega-Trends 2026"],
+        price: "32,64 €",
+        change: "+15,4 %",
+        kgv: "13,2",
+        divRendite: "3,6 %",
+        umsatzWachstum: "+3,9 %",
+        marge: "4,3 %",
+        chart: [28.1, 28.5, 29.0, 29.4, 30.1, 30.8, 30.5, 31.2, 31.7, 32.0, 32.4, 32.64]
+      },
+      {
+        id: 11,
+        name: "Air Products and Chemicals",
+        ticker: "APD",
+        wkn: "854912",
+        isin: "US0091581068",
+        strategie: "Dividende",
+        status: "Position verwalten",
+        chance: 3,
+        risiko: 2,
+        wlatar: 63,
+        wlafar: 76,
+        rating: "halten",
+        land: "USA",
+        branche: "Industrie",
+        tags: [],
+        price: "312,00 $",
+        change: "+14,8 %",
+        kgv: "24,1",
+        divRendite: "2,3 %",
+        umsatzWachstum: "+4,5 %",
+        marge: "24,2 %",
+        chart: [270, 275, 282, 288, 295, 290, 298, 304, 308, 310, 311, 312]
+      },
+      {
+        id: 12,
+        name: "Alibaba Group",
+        ticker: "BABA",
+        wkn: "A117ME",
+        isin: "US01609W1027",
+        strategie: "Wachstum",
+        status: "Bodenbildung",
+        chance: 5,
+        risiko: 4,
+        wlatar: 86,
+        wlafar: 82,
+        rating: "kaufen",
+        land: "China",
+        branche: "Nicht-Basiskonsumgüter",
+        tags: ["Mega-Trends 2026"],
+        price: "96,40 $",
+        change: "+26,8 %",
+        kgv: "11,4",
+        divRendite: "1,1 %",
+        umsatzWachstum: "+8,9 %",
+        marge: "16,8 %",
+        chart: [75, 77, 76, 79, 82, 85, 84, 88, 91, 93, 95, 96.4]
+      },
+      {
+        id: 13,
+        name: "Unilever",
+        ticker: "ULVR",
+        wkn: "A0JNE2",
+        isin: "GB00B10RZP78",
+        strategie: "Dividende",
+        status: "Bodenbildung",
+        chance: 4,
+        risiko: 1,
+        wlatar: 78,
+        wlafar: 80,
+        rating: "kaufen",
+        land: "Großbritannien",
+        branche: "Basiskonsumgüter",
+        tags: [],
+        price: "56,80 €",
+        change: "+16,2 %",
+        kgv: "18,9",
+        divRendite: "3,1 %",
+        umsatzWachstum: "+4,1 %",
+        marge: "17,9 %",
+        chart: [48.5, 49.2, 50.1, 51.4, 52.0, 53.1, 52.8, 54.0, 55.1, 55.9, 56.4, 56.8]
+      },
+      {
+        id: 14,
+        name: "AstraZeneca",
+        ticker: "AZN",
+        wkn: "886455",
+        isin: "GB0009895292",
+        strategie: "Wachstum",
+        status: "Boden abwarten",
+        chance: 5,
+        risiko: 2,
+        wlatar: 84,
+        wlafar: 89,
+        rating: "kaufen",
+        land: "Großbritannien",
+        branche: "Gesundheitswesen",
+        tags: ["Mega-Trends 2026"],
+        price: "108,40 £",
+        change: "+7,3 %",
+        kgv: "19,6",
+        divRendite: "2,2 %",
+        umsatzWachstum: "+14,5 %",
+        marge: "22,4 %",
+        chart: [101, 104, 109, 115, 118, 114, 110, 107, 106, 107.2, 108, 108.4]
+      },
+      {
+        id: 15,
+        name: "SAP",
+        ticker: "SAP",
+        wkn: "716460",
+        isin: "DE0007164600",
+        strategie: "Wachstum",
+        status: "Bodenbildung",
+        chance: 4,
+        risiko: 2,
+        wlatar: 85,
+        wlafar: 88,
+        rating: "kaufen",
+        land: "Deutschland",
+        branche: "Informationstechnologie",
+        tags: ["Mega-Trends 2026"],
+        price: "238,50 €",
+        change: "+29,4 %",
+        kgv: "34,2",
+        divRendite: "1,0 %",
+        umsatzWachstum: "+10,6 %",
+        marge: "24,7 %",
+        chart: [184, 190, 196, 202, 208, 214, 212, 219, 225, 231, 235, 238.5]
+      },
+      {
+        id: 16,
+        name: "ASML Holding",
+        ticker: "ASML",
+        wkn: "A1J4U4",
+        isin: "NL0010273215",
+        strategie: "Wachstum",
+        status: "Boden abwarten",
+        chance: 5,
+        risiko: 3,
+        wlatar: 80,
+        wlafar: 94,
+        rating: "kaufen",
+        land: "Niederlande",
+        branche: "Informationstechnologie",
+        tags: ["Mega-Trends 2026"],
+        price: "684,00 €",
+        change: "-8,5 %",
+        kgv: "28,7",
+        divRendite: "0,9 %",
+        umsatzWachstum: "+16,8 %",
+        marge: "31,2 %",
+        chart: [760, 810, 845, 790, 740, 710, 690, 675, 672, 678, 681, 684]
+      },
+      {
+        id: 17,
+        name: "Microsoft",
+        ticker: "MSFT",
+        wkn: "870747",
+        isin: "US5949181045",
+        strategie: "Wachstum",
+        status: "Bodenbildung",
+        chance: 5,
+        risiko: 1,
+        wlatar: 88,
+        wlafar: 96,
+        rating: "kaufen",
+        land: "USA",
+        branche: "Informationstechnologie",
+        tags: ["Software-Crash", "Mega-Trends 2026"],
+        price: "438,20 $",
+        change: "+14,9 %",
+        kgv: "31,5",
+        divRendite: "0,8 %",
+        umsatzWachstum: "+15,4 %",
+        marge: "44,1 %",
+        chart: [382, 395, 408, 422, 435, 428, 418, 424, 429, 433, 436, 438.2]
+      },
+      {
+        id: 18,
+        name: "Salesforce",
+        ticker: "CRM",
+        wkn: "A0B87V",
+        isin: "US79466L3024",
+        strategie: "Cashflow",
+        status: "Boden abwarten",
+        chance: 4,
+        risiko: 2,
+        wlatar: 77,
+        wlafar: 86,
+        rating: "kaufen",
+        land: "USA",
+        branche: "Informationstechnologie",
+        tags: ["Software-Crash", "Trump-Depot"],
+        price: "314,80 $",
+        change: "+11,2 %",
+        kgv: "27,9",
+        divRendite: "0,5 %",
+        umsatzWachstum: "+9,8 %",
+        marge: "28,4 %",
+        chart: [284, 292, 278, 265, 272, 285, 294, 301, 306, 310, 312, 314.8]
+      },
+      {
+        id: 19,
+        name: "Siemens",
+        ticker: "SIE",
+        wkn: "723610",
+        isin: "DE0007236101",
+        strategie: "Dividende",
+        status: "Bodenbildung",
+        chance: 4,
+        risiko: 2,
+        wlatar: 81,
+        wlafar: 83,
+        rating: "kaufen",
+        land: "Deutschland",
+        branche: "Industrie",
+        tags: ["Mega-Trends 2026"],
+        price: "189,40 €",
+        change: "+19,1 %",
+        kgv: "16,5",
+        divRendite: "2,6 %",
+        umsatzWachstum: "+6,4 %",
+        marge: "14,8 %",
+        chart: [158, 162, 168, 172, 170, 175, 179, 182, 185, 187, 188.5, 189.4]
+      },
+      {
+        id: 20,
+        name: "Allianz",
+        ticker: "ALV",
+        wkn: "840400",
+        isin: "DE0008404005",
+        strategie: "Dividende",
+        status: "Regression abwarten",
+        chance: 4,
+        risiko: 1,
+        wlatar: 79,
+        wlafar: 85,
+        rating: "kaufen",
+        land: "Deutschland",
+        branche: "Finanzen",
+        tags: [],
+        price: "294,60 €",
+        change: "+21,3 %",
+        kgv: "11,2",
+        divRendite: "4,8 %",
+        umsatzWachstum: "+5,9 %",
+        marge: "12,1 %",
+        chart: [242, 248, 254, 260, 265, 271, 276, 280, 285, 289, 292, 294.6]
+      },
+      {
+        id: 21,
+        name: "Novo Nordisk",
+        ticker: "NOVO-B",
+        wkn: "A3EU6F",
+        isin: "DK0062498333",
+        strategie: "Wachstum",
+        status: "Boden abwarten",
+        chance: 5,
+        risiko: 2,
+        wlatar: 75,
+        wlafar: 95,
+        rating: "kaufen",
+        land: "Dänemark",
+        branche: "Gesundheitswesen",
+        tags: ["Mega-Trends 2026"],
+        price: "768,00 DKK",
+        change: "-9,4 %",
+        kgv: "29,8",
+        divRendite: "1,4 %",
+        umsatzWachstum: "+24,2 %",
+        marge: "43,6 %",
+        chart: [860, 895, 920, 880, 845, 810, 790, 775, 760, 762, 765, 768]
+      },
+      {
+        id: 22,
+        name: "Nestlé",
+        ticker: "NESN",
+        wkn: "A0Q4DC",
+        isin: "CH0038863350",
+        strategie: "Dividende",
+        status: "Boden abwarten",
+        chance: 4,
+        risiko: 1,
+        wlatar: 68,
+        wlafar: 77,
+        rating: "kaufen",
+        land: "Schweiz",
+        branche: "Basiskonsumgüter",
+        tags: [],
+        price: "82,40 CHF",
+        change: "-11,2 %",
+        kgv: "17,1",
+        divRendite: "3,7 %",
+        umsatzWachstum: "+2,1 %",
+        marge: "17,2 %",
+        chart: [94, 92, 90, 88, 86, 85, 84, 83, 81.8, 82.0, 82.2, 82.4]
+      },
+      {
+        id: 23,
+        name: "BYD",
+        ticker: "1211",
+        wkn: "A0M4W9",
+        isin: "CNE100000296",
+        strategie: "Wachstum",
+        status: "Bodenbildung",
+        chance: 4,
+        risiko: 3,
+        wlatar: 84,
+        wlafar: 81,
+        rating: "kaufen",
+        land: "China",
+        branche: "Nicht-Basiskonsumgüter",
+        tags: ["Mega-Trends 2026"],
+        price: "276,40 HKD",
+        change: "+31,5 %",
+        kgv: "18,4",
+        divRendite: "1,2 %",
+        umsatzWachstum: "+21,7 %",
+        marge: "8,9 %",
+        chart: [208, 215, 224, 232, 240, 248, 255, 260, 266, 270, 274, 276.4]
+      },
+      {
+        id: 24,
+        name: "Deutsche Telekom",
+        ticker: "DTE",
+        wkn: "555750",
+        isin: "DE0005557508",
+        strategie: "Dividende",
+        status: "Regression abwarten",
+        chance: 4,
+        risiko: 1,
+        wlatar: 87,
+        wlafar: 80,
+        rating: "kaufen",
+        land: "Deutschland",
+        branche: "Informationstechnologie",
+        tags: [],
+        price: "28,95 €",
+        change: "+27,8 %",
+        kgv: "14,9",
+        divRendite: "3,1 %",
+        umsatzWachstum: "+4,2 %",
+        marge: "18,4 %",
+        chart: [22.4, 23.0, 23.8, 24.5, 25.1, 25.8, 26.4, 27.0, 27.6, 28.1, 28.6, 28.95]
+      },
+      {
+        id: 25,
+        name: "ServiceNow",
+        ticker: "NOW",
+        wkn: "A1JX4P",
+        isin: "US81762P1021",
+        strategie: "Wachstum",
+        status: "Bodenbildung",
+        chance: 5,
+        risiko: 2,
+        wlatar: 89,
+        wlafar: 91,
+        rating: "kaufen",
+        land: "USA",
+        branche: "Informationstechnologie",
+        tags: ["Software-Crash", "Trump-Depot"],
+        price: "942,00 $",
+        change: "+22,6 %",
+        kgv: "48,5",
+        divRendite: "0,0 %",
+        umsatzWachstum: "+22,4 %",
+        marge: "29,5 %",
+        chart: [765, 780, 805, 825, 850, 840, 865, 890, 910, 924, 935, 942]
+      },
+      {
+        id: 26,
+        name: "PayPal Holdings",
+        ticker: "PYPL",
+        wkn: "A14R7U",
+        isin: "US70450Y1038",
+        strategie: "Cashflow",
+        status: "Turnaround",
+        chance: 4,
+        risiko: 3,
+        wlatar: 76,
+        wlafar: 74,
+        rating: "kaufen",
+        land: "USA",
+        branche: "Finanzen",
+        tags: ["Trump-Depot"],
+        price: "84,60 $",
+        change: "+34,2 %",
+        kgv: "17,8",
+        divRendite: "0,0 %",
+        umsatzWachstum: "+7,8 %",
+        marge: "18,2 %",
+        chart: [62, 64, 63, 66, 69, 72, 74, 77, 80, 82, 83.5, 84.6]
+      },
+      {
+        id: 27,
+        name: "Infineon Technologies",
+        ticker: "IFX",
+        wkn: "623100",
+        isin: "DE0006231004",
+        strategie: "Wachstum",
+        status: "Dynamikverlust",
+        chance: 3,
+        risiko: 3,
+        wlatar: 54,
+        wlafar: 73,
+        rating: "halten",
+        land: "Deutschland",
+        branche: "Informationstechnologie",
+        tags: [],
+        price: "31,20 €",
+        change: "-7,9 %",
+        kgv: "18,6",
+        divRendite: "1,1 %",
+        umsatzWachstum: "-1,8 %",
+        marge: "19,4 %",
+        chart: [34.5, 35.2, 34.0, 33.1, 32.5, 32.8, 31.9, 31.5, 31.0, 30.9, 31.1, 31.2]
+      },
+      {
+        id: 28,
+        name: "RWE",
+        ticker: "RWE",
+        wkn: "703712",
+        isin: "DE0007037129",
+        strategie: "Cashflow",
+        status: "Boden abwarten",
+        chance: 4,
+        risiko: 2,
+        wlatar: 69,
+        wlafar: 78,
+        rating: "kaufen",
+        land: "Deutschland",
+        branche: "Versorger",
+        tags: ["Mega-Trends 2026"],
+        price: "31,85 €",
+        change: "-5,4 %",
+        kgv: "12,4",
+        divRendite: "3,4 %",
+        umsatzWachstum: "+4,6 %",
+        marge: "16,1 %",
+        chart: [34.2, 33.8, 33.1, 32.5, 32.0, 31.4, 31.0, 31.2, 31.5, 31.6, 31.75, 31.85]
+      }
+    ];
+
+    const RATINGS = ["kaufen", "halten", "verkaufen"];
+    const STATUSES = [
+      "Boden abwarten",
+      "Bodenbildung",
+      "Dynamikverlust",
+      "Position verwalten",
+      "Regression abwarten",
+      "Trendbruch",
+      "Turnaround",
+      "Underperformance"
+    ];
+    const STRATEGIES = ["Alle", "Wachstum", "Cashflow", "Dividende"];
+    const TAGS = ["Mega-Trends 2026", "Software-Crash", "Trump-Depot"];
+
+    // Application Filter & Sort State
+    const state = {
+      search: "",
+      ratings: new Set(),
+      statuses: new Set(),
+      strategy: "Alle",
+      tag: null,
+      chanceMin: 1,
+      chanceMax: 5,
+      risikoMin: 1,
+      risikoMax: 5,
+      wlatarMin: 0,
+      wlatarMax: 100,
+      wlafarMin: 0,
+      wlafarMax: 100,
+      sortKey: "name",
+      sortDir: "asc",
+      filterVisible: true
+    };
+
+    // DOM References
+    const el = {
+      searchInput: document.getElementById("searchInput"),
+      clearSearchBtn: document.getElementById("clearSearchBtn"),
+      resetFiltersBtn: document.getElementById("resetFiltersBtn"),
+      emptyResetBtn: document.getElementById("emptyResetBtn"),
+      resetLabel: document.getElementById("resetLabel"),
+      toggleFilterBtn: document.getElementById("toggleFilterBtn"),
+      filterChevron: document.getElementById("filterChevron"),
+      filterPanel: document.getElementById("filterPanel"),
+      ratingPills: document.getElementById("ratingPills"),
+      statusPills: document.getElementById("statusPills"),
+      strategyPills: document.getElementById("strategyPills"),
+      tagPills: document.getElementById("tagPills"),
+      resultCountText: document.getElementById("resultCountText"),
+      activeFilterSummary: document.getElementById("activeFilterSummary"),
+      stockTableBody: document.getElementById("stockTableBody"),
+      emptyState: document.getElementById("emptyState"),
+      mobileSortSelect: document.getElementById("mobileSortSelect"),
+      detailModal: document.getElementById("detailModal"),
+      closeModalBtn: document.getElementById("closeModalBtn")
+    };
+
+    // Helper: Check if stock matches all filters except optionally one facet (for dynamic pill counts)
+    function matchesFilters(stock, ignoreFacet = null) {
+      if (state.search.trim() !== "") {
+        const q = state.search.trim().toLowerCase();
+        const hay = `${stock.name} ${stock.ticker} ${stock.wkn} ${stock.isin} ${stock.land} ${stock.branche}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+
+      if (ignoreFacet !== "rating" && state.ratings.size > 0 && !state.ratings.has(stock.rating)) {
+        return false;
+      }
+
+      if (ignoreFacet !== "status" && state.statuses.size > 0 && !state.statuses.has(stock.status)) {
+        return false;
+      }
+
+      if (ignoreFacet !== "strategy" && state.strategy !== "Alle" && stock.strategie !== state.strategy) {
+        return false;
+      }
+
+      if (ignoreFacet !== "tag" && state.tag && !stock.tags.includes(state.tag)) {
+        return false;
+      }
+
+      if (stock.chance < state.chanceMin || stock.chance > state.chanceMax) return false;
+      if (stock.risiko < state.risikoMin || stock.risiko > state.risikoMax) return false;
+      if (stock.wlatar < state.wlatarMin || stock.wlatar > state.wlatarMax) return false;
+      if (stock.wlafar < state.wlafarMin || stock.wlafar > state.wlafarMax) return false;
+
+      return true;
+    }
+
+    // Render 5 Signal Bars (Chance or Risiko)
+    function renderSignalBars(value, activeColorClass = "bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.5)]") {
+      let html = `<div class="inline-flex items-center gap-[3px]" title="${value} von 5">`;
+      for (let i = 1; i <= 5; i++) {
+        const active = i <= value;
+        html += `<span class="w-[3.5px] h-3.5 rounded-full transition-colors ${active ? activeColorClass : "bg-zinc-700/80"}"></span>`;
+      }
+      html += `</div>`;
+      return html;
+    }
+
+    // Render Rating Badge
+    function renderRatingBadge(rating) {
+      if (rating === "kaufen") {
+        return `<span class="inline-flex items-center gap-1 text-xs font-semibold text-lime-400"><span class="text-yellow-400">↑</span> kaufen</span>`;
+      }
+      if (rating === "verkaufen") {
+        return `<span class="inline-flex items-center gap-1 text-xs font-semibold text-rose-400"><span>↓</span> verkaufen</span>`;
+      }
+      return `<span class="inline-flex items-center gap-1 text-xs font-medium text-zinc-300"><span class="text-yellow-500/80">→</span> halten</span>`;
+    }
+
+    // Render Status Badge
+    function renderStatusBadge(status) {
+      const highlightStatuses = ["Bodenbildung", "Boden abwarten", "Turnaround"];
+      const warnStatuses = ["Trendbruch", "Underperformance", "Dynamikverlust"];
+      if (highlightStatuses.includes(status)) {
+        return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-yellow-500/12 text-yellow-300 border border-yellow-500/35">${status}</span>`;
+      }
+      if (warnStatuses.includes(status)) {
+        return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-zinc-800/90 text-zinc-400 border border-zinc-700/80">${status}</span>`;
+      }
+      return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#232328] text-zinc-200 border border-[#32323a]">${status}</span>`;
+    }
+
+    // Render Score Pill (WLATAR / WLAFAR)
+    function renderScorePill(score) {
+      let cls = "bg-[#232329] text-zinc-300 border-[#32323b]";
+      if (score >= 80) cls = "bg-yellow-500/15 text-yellow-300 border-yellow-500/40 font-semibold";
+      else if (score >= 65) cls = "bg-zinc-800 text-zinc-100 border-zinc-600/60 font-medium";
+      else if (score < 45) cls = "bg-rose-500/10 text-rose-300 border-rose-500/30";
+
+      return `<span class="inline-flex items-center justify-center min-w-[36px] px-2 py-0.5 rounded-md text-xs border ${cls}">${score}</span>`;
+    }
+
+    // Update Filter Pills (Dynamic counts + Active styling matching screenshot)
+    function renderFilterPills() {
+      // 1. Rating Pills
+      el.ratingPills.innerHTML = RATINGS.map((r) => {
+        const active = state.ratings.has(r);
+        const count = STOCKS.filter((s) => matchesFilters(s, "rating") && s.rating === r).length;
+        const baseCls = "px-3.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none";
+        const activeCls = active
+          ? "bg-yellow-500/15 border-yellow-500 text-yellow-400 shadow-[0_0_12px_rgba(234,179,8,0.18)]"
+          : "bg-[#232328] border-[#32323a] text-zinc-300 hover:border-zinc-500 hover:text-white";
+        const countCls = active ? "text-yellow-400 font-bold" : "text-zinc-400";
+
+        return `
+          <button type="button" data-rating="${r}" class="${baseCls} ${activeCls}">
+            <span>${r}</span>
+            <span class="${countCls}">${count}</span>
+          </button>
+        `;
+      }).join("");
+
+      // 2. Status Pills
+      el.statusPills.innerHTML = STATUSES.map((st) => {
+        const active = state.statuses.has(st);
+        const count = STOCKS.filter((s) => matchesFilters(s, "status") && s.status === st).length;
+        const baseCls = "px-3.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none";
+        const activeCls = active
+          ? "bg-yellow-500/15 border-yellow-500 text-yellow-400 shadow-[0_0_12px_rgba(234,179,8,0.18)]"
+          : "bg-[#232328] border-[#32323a] text-zinc-300 hover:border-zinc-500 hover:text-white";
+        const countCls = active ? "text-yellow-400 font-bold" : "text-zinc-400";
+
+        return `
+          <button type="button" data-status="${st}" class="${baseCls} ${activeCls}">
+            <span>${st}</span>
+            <span class="${countCls}">${count}</span>
+          </button>
+        `;
+      }).join("");
+
+      // 3. Strategy Pills
+      el.strategyPills.innerHTML = STRATEGIES.map((strat) => {
+        const active = state.strategy === strat;
+        const count = strat === "Alle"
+          ? STOCKS.filter((s) => matchesFilters(s, "strategy")).length
+          : STOCKS.filter((s) => matchesFilters(s, "strategy") && s.strategie === strat).length;
+
+        const baseCls = "px-3 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none";
+        const activeCls = active
+          ? "bg-yellow-500/15 border-yellow-500 text-yellow-400 shadow-[0_0_10px_rgba(234,179,8,0.15)]"
+          : "bg-[#232328] border-[#32323a] text-zinc-300 hover:border-zinc-500 hover:text-white";
+
+        return `
+          <button type="button" data-strategy="${strat}" class="${baseCls} ${activeCls}">
+            <span>${strat}</span>
+            <span class="text-[11px] ${active ? "text-yellow-400" : "text-zinc-500"}">${count}</span>
+          </button>
+        `;
+      }).join("");
+
+      // 4. Tag Pills
+      el.tagPills.innerHTML = TAGS.map((tag) => {
+        const active = state.tag === tag;
+        const count = STOCKS.filter((s) => matchesFilters(s, "tag") && s.tags.includes(tag)).length;
+        const baseCls = "px-3 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 border cursor-pointer select-none";
+        const activeCls = active
+          ? "bg-amber-500/20 border-amber-400 text-amber-300"
+          : "bg-[#232328] border-[#32323a] text-zinc-300 hover:border-amber-500/50 hover:text-amber-200";
+
+        return `
+          <button type="button" data-tag="${tag}" class="${baseCls} ${activeCls}">
+            <span>${tag}</span>
+            <span class="text-[11px] ${active ? "text-amber-300" : "text-zinc-500"}">${count}</span>
+          </button>
+        `;
+      }).join("");
+    }
+
+    // Update Dual Range Sliders UI & Labels
+    function syncSlidersUI() {
+      const sliders = [
+        { key: "chance", min: 1, max: 5, unit: "" },
+        { key: "risiko", min: 1, max: 5, unit: "" },
+        { key: "wlatar", min: 0, max: 100, unit: "" },
+        { key: "wlafar", min: 0, max: 100, unit: "" }
+      ];
+
+      sliders.forEach(({ key, min, max }) => {
+        const minInput = document.getElementById(`${key}Min`);
+        const maxInput = document.getElementById(`${key}Max`);
+        const fill = document.getElementById(`${key}Fill`);
+        const label = document.getElementById(`${key}RangeText`);
+
+        const curMin = state[`${key}Min`];
+        const curMax = state[`${key}Max`];
+
+        minInput.value = curMin;
+        maxInput.value = curMax;
+
+        const leftPct = ((curMin - min) / (max - min)) * 100;
+        const rightPct = ((curMax - min) / (max - min)) * 100;
+
+        fill.style.left = `${leftPct}%`;
+        fill.style.width = `${Math.max(0, rightPct - leftPct)}%`;
+
+        if (curMin === min && curMax === max) {
+          label.textContent = "egal";
+          label.className = "text-xs font-medium text-zinc-400";
+        } else if (curMin === curMax) {
+          label.textContent = `${curMin}`;
+          label.className = "text-xs font-semibold text-yellow-400";
+        } else {
+          label.textContent = `${curMin} – ${curMax}`;
+          label.className = "text-xs font-semibold text-yellow-400";
+        }
+      });
+    }
+
+    // Count active filter groups
+    function getActiveFilterCount() {
+      let count = 0;
+      if (state.search.trim() !== "") count++;
+      if (state.ratings.size > 0) count++;
+      if (state.statuses.size > 0) count++;
+      if (state.strategy !== "Alle") count++;
+      if (state.tag) count++;
+      if (state.chanceMin > 1 || state.chanceMax < 5) count++;
+      if (state.risikoMin > 1 || state.risikoMax < 5) count++;
+      if (state.wlatarMin > 0 || state.wlatarMax < 100) count++;
+      if (state.wlafarMin > 0 || state.wlafarMax < 100) count++;
+      return count;
+    }
+
+    // Render Stock Table
+    function renderTable() {
+      const filtered = STOCKS.filter((s) => matchesFilters(s));
+
+      // Sort filtered results
+      const ratingRank = { kaufen: 3, halten: 2, verkaufen: 1 };
+      filtered.sort((a, b) => {
+        let valA = a[state.sortKey];
+        let valB = b[state.sortKey];
+
+        if (state.sortKey === "rating") {
+          valA = ratingRank[a.rating] || 0;
+          valB = ratingRank[b.rating] || 0;
+        }
+
+        if (typeof valA === "string") {
+          const cmp = valA.localeCompare(valB, "de");
+          return state.sortDir === "asc" ? cmp : -cmp;
+        }
+        return state.sortDir === "asc" ? valA - valB : valB - valA;
+      });
+
+      // Update Result Count & Reset Button State
+      el.resultCountText.textContent = `${filtered.length} von ${STOCKS.length} Aktien angezeigt (Universum: 320)`;
+
+      const activeCount = getActiveFilterCount();
+      if (activeCount > 0) {
+        el.resetLabel.textContent = `Filter zurücksetzen (${activeCount})`;
+        el.resetFiltersBtn.classList.add("border-yellow-500/50", "text-yellow-300");
+      } else {
+        el.resetLabel.textContent = "Kein Filter aktiv";
+        el.resetFiltersBtn.classList.remove("border-yellow-500/50", "text-yellow-300");
+      }
+
+      // Render Sort Indicators
+      document.querySelectorAll(".sort-header").forEach((th) => {
+        const key = th.dataset.sort;
+        const icon = th.querySelector(".sort-icon");
+        if (key === state.sortKey) {
+          icon.textContent = state.sortDir === "asc" ? "▲" : "▼";
+          icon.className = "sort-icon text-yellow-400";
+        } else {
+          icon.textContent = "⇅";
+          icon.className = "sort-icon text-zinc-600";
+        }
+      });
+
+      // Handle Empty State
+      if (filtered.length === 0) {
+        el.stockTableBody.innerHTML = "";
+        el.emptyState.classList.remove("hidden");
+        return;
+      }
+      el.emptyState.classList.add("hidden");
+
+      // Render Rows
+      el.stockTableBody.innerHTML = filtered
+        .map((stock) => {
+          const tagHtml =
+            stock.tags.length > 0
+              ? `<div class="flex flex-wrap gap-1 mb-1">
+                  ${stock.tags
+                    .map(
+                      (t) =>
+                        `<span class="text-[10px] font-semibold tracking-wide px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25">${t}</span>`
+                    )
+                    .join("")}
+                </div>`
+              : "";
+
+          const risikoColor =
+            stock.risiko >= 4
+              ? "bg-rose-400"
+              : stock.risiko === 3
+              ? "bg-amber-400"
+              : "bg-emerald-400";
+
+          return `
+            <tr data-stock-id="${stock.id}" class="stock-row hover:bg-[#222227] transition-colors cursor-pointer group">
+              <td class="py-3.5 px-4">
+                ${tagHtml}
+                <div class="font-semibold text-white group-hover:text-yellow-400 transition-colors leading-snug">
+                  ${stock.name}
+                </div>
+                <div class="text-[11px] text-zinc-500 font-mono mt-0.5">
+                  ${stock.ticker} • WKN ${stock.wkn}
+                </div>
+              </td>
+              <td class="py-3.5 px-3">
+                <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-medium bg-[#222227] text-zinc-200 border border-[#34343d] min-w-[92px]">
+                  ${stock.strategie}
+                </span>
+              </td>
+              <td class="py-3.5 px-3">
+                ${renderStatusBadge(stock.status)}
+              </td>
+              <td class="py-3.5 px-3">
+                ${renderSignalBars(stock.chance)}
+              </td>
+              <td class="py-3.5 px-3">
+                ${renderSignalBars(stock.risiko, risikoColor)}
+              </td>
+              <td class="py-3.5 px-3 text-center">
+                ${renderScorePill(stock.wlatar)}
+              </td>
+              <td class="py-3.5 px-3 text-center">
+                ${renderScorePill(stock.wlafar)}
+              </td>
+              <td class="py-3.5 px-3 whitespace-nowrap">
+                ${renderRatingBadge(stock.rating)}
+              </td>
+              <td class="py-3.5 px-3 text-xs text-zinc-200 whitespace-nowrap">
+                ${stock.land}
+              </td>
+              <td class="py-3.5 px-4 text-xs text-zinc-300">
+                ${stock.branche}
+              </td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    // Master Re-render
+    function updateAll() {
+      renderFilterPills();
+      syncSlidersUI();
+      renderTable();
+    }
+
+    // Reset all filters
+    function resetFilters() {
+      state.search = "";
+      state.ratings.clear();
+      state.statuses.clear();
+      state.strategy = "Alle";
+      state.tag = null;
+      state.chanceMin = 1;
+      state.chanceMax = 5;
+      state.risikoMin = 1;
+      state.risikoMax = 5;
+      state.wlatarMin = 0;
+      state.wlatarMax = 100;
+      state.wlafarMin = 0;
+      state.wlafarMax = 100;
+
+      el.searchInput.value = "";
+      el.clearSearchBtn.classList.add("hidden");
+      updateAll();
+    }
+
+    // Build SVG Chart for Detail Modal
+    function buildPriceChartSVG(points) {
+      const width = 680;
+      const height = 180;
+      const padX = 16;
+      const padY = 20;
+
+      const minVal = Math.min(...points) * 0.985;
+      const maxVal = Math.max(...points) * 1.015;
+      const range = maxVal - minVal || 1;
+
+      const coords = points.map((val, idx) => {
+        const x = padX + (idx / (points.length - 1)) * (width - padX * 2);
+        const y = height - padY - ((val - minVal) / range) * (height - padY * 2);
+        return [x, y];
+      });
+
+      const linePath = coords.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+      const areaPath = `${linePath} L ${coords[coords.length - 1][0].toFixed(1)} ${height - padY} L ${coords[0][0].toFixed(1)} ${height - padY} Z`;
+
+      const months = ["Dez", "Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov"];
+
+      return `
+        <svg viewBox="0 0 ${width} ${height}" class="w-full h-full overflow-visible">
+          <defs>
+            <linearGradient id="wlaChartGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#eab308" stop-opacity="0.32" />
+              <stop offset="100%" stop-color="#eab308" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
+          <!-- Grid Lines -->
+          <line x1="${padX}" y1="${padY}" x2="${width - padX}" y2="${padY}" stroke="#2c2c34" stroke-dasharray="4 4" />
+          <line x1="${padX}" y1="${height / 2}" x2="${width - padX}" y2="${height / 2}" stroke="#2c2c34" stroke-dasharray="4 4" />
+          <line x1="${padX}" y1="${height - padY}" x2="${width - padX}" y2="${height - padY}" stroke="#2c2c34" />
+
+          <!-- Area & Line -->
+          <path d="${areaPath}" fill="url(#wlaChartGrad)" />
+          <path d="${linePath}" fill="none" stroke="#eab308" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+
+          <!-- Data Points & Month Labels -->
+          ${coords
+            .map(
+              ([x, y], i) => `
+              <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="#18181b" stroke="#eab308" stroke-width="2" />
+              <text x="${x.toFixed(1)}" y="${height - 4}" text-anchor="middle" fill="#71717a" font-size="10">${months[i] || ""}</text>
+            `
+            )
+            .join("")}
+        </svg>
+      `;
+    }
+
+    // Open Stock Detail Modal
+    function openStockModal(stock) {
+      document.getElementById("modalName").textContent = stock.name;
+      document.getElementById("modalTicker").textContent = stock.ticker;
+      document.getElementById("modalWkn").textContent = `WKN: ${stock.wkn}`;
+      document.getElementById("modalMeta").textContent = `${stock.land} • ${stock.branche} • ISIN: ${stock.isin}`;
+
+      const modalTags = document.getElementById("modalTags");
+      modalTags.innerHTML = stock.tags
+        .map(
+          (t) =>
+            `<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">${t}</span>`
+        )
+        .join("");
+
+      document.getElementById("modalRating").innerHTML = renderRatingBadge(stock.rating);
+      document.getElementById("modalStatus").textContent = stock.status;
+      document.getElementById("modalChanceBars").innerHTML = renderSignalBars(stock.chance);
+      document.getElementById("modalRisikoText").textContent = `Risiko: ${stock.risiko}/5`;
+      document.getElementById("modalStrategie").textContent = stock.strategie;
+
+      const isPos = !stock.change.startsWith("-");
+      document.getElementById("modalPriceHeadline").innerHTML = `
+        ${stock.price}
+        <span class="text-xs font-semibold ml-1.5 ${isPos ? "text-emerald-400" : "text-rose-400"}">${stock.change} (12M)</span>
+      `;
+      document.getElementById("modalChartContainer").innerHTML = buildPriceChartSVG(stock.chart);
+
+      document.getElementById("modalWlatarScore").textContent = `${stock.wlatar} / 100`;
+      document.getElementById("modalWlatarBar").style.width = `${stock.wlatar}%`;
+      document.getElementById("modalWlafarScore").textContent = `${stock.wlafar} / 100`;
+      document.getElementById("modalWlafarBar").style.width = `${stock.wlafar}%`;
+
+      document.getElementById("modalTechNote").textContent =
+        stock.wlatar >= 75
+          ? `Technischer Status „${stock.status}“ mit hohem WLATAR (${stock.wlatar}). Momentum und Unterstützungszonen sprechen für ein günstiges Einstiegsfenster.`
+          : `Technischer Status „${stock.status}“ (WLATAR ${stock.wlatar}). Bestätigung einer Bodenbildung bzw. Trendfortsetzung sollte abgewartet werden.`;
+
+      document.getElementById("modalFundNote").textContent =
+        stock.wlafar >= 80
+          ? `Starkes fundamentales Profil (WLAFAR ${stock.wlafar}): Hohe Profitabilität (${stock.marge} operative Marge) und verlässliches Wachstum.`
+          : `Solide fundamentale Basis (WLAFAR ${stock.wlafar}) innerhalb der Branche ${stock.branche} mit Fokus auf ${stock.strategie}.`;
+
+      document.getElementById("modalFundamentals").innerHTML = `
+        <div class="bg-[#18181b] p-2.5 rounded-lg border border-[#292930]">
+          <div class="text-zinc-500">KGV (erw.)</div>
+          <div class="text-sm font-semibold text-white mt-0.5">${stock.kgv}</div>
+        </div>
+        <div class="bg-[#18181b] p-2.5 rounded-lg border border-[#292930]">
+          <div class="text-zinc-500">Dividendenrendite</div>
+          <div class="text-sm font-semibold text-white mt-0.5">${stock.divRendite}</div>
+        </div>
+        <div class="bg-[#18181b] p-2.5 rounded-lg border border-[#292930]">
+          <div class="text-zinc-500">Umsatzwachstum</div>
+          <div class="text-sm font-semibold text-white mt-0.5">${stock.umsatzWachstum}</div>
+        </div>
+        <div class="bg-[#18181b] p-2.5 rounded-lg border border-[#292930]">
+          <div class="text-zinc-500">Operative Marge</div>
+          <div class="text-sm font-semibold text-white mt-0.5">${stock.marge}</div>
+        </div>
+      `;
+
+      el.detailModal.classList.remove("hidden");
+      el.detailModal.classList.add("flex");
+    }
+
+    // Event Listeners Setup
+    function initEvents() {
+      // Search input
+      el.searchInput.addEventListener("input", (e) => {
+        state.search = e.target.value;
+        el.clearSearchBtn.classList.toggle("hidden", state.search.length === 0);
+        updateAll();
+      });
+
+      el.clearSearchBtn.addEventListener("click", () => {
+        state.search = "";
+        el.searchInput.value = "";
+        el.clearSearchBtn.classList.add("hidden");
+        updateAll();
+      });
+
+      // Reset buttons
+      el.resetFiltersBtn.addEventListener("click", resetFilters);
+      el.emptyResetBtn.addEventListener("click", resetFilters);
+
+      // Collapse/Expand Filter Panel
+      el.toggleFilterBtn.addEventListener("click", () => {
+        state.filterVisible = !state.filterVisible;
+        el.filterPanel.classList.toggle("hidden", !state.filterVisible);
+        el.filterChevron.style.transform = state.filterVisible ? "rotate(0deg)" : "rotate(-90deg)";
+        el.toggleFilterBtn.querySelector("span").textContent = state.filterVisible
+          ? "Filter ausblenden"
+          : "Filter einblenden";
+      });
+
+      // Multi-select Rating Pills
+      el.ratingPills.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-rating]");
+        if (!btn) return;
+        const val = btn.dataset.rating;
+        if (state.ratings.has(val)) state.ratings.delete(val);
+        else state.ratings.add(val);
+        updateAll();
+      });
+
+      // Multi-select Status Pills
+      el.statusPills.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-status]");
+        if (!btn) return;
+        const val = btn.dataset.status;
+        if (state.statuses.has(val)) state.statuses.delete(val);
+        else state.statuses.add(val);
+        updateAll();
+      });
+
+      // Single-select Strategy Pills
+      el.strategyPills.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-strategy]");
+        if (!btn) return;
+        state.strategy = btn.dataset.strategy;
+        updateAll();
+      });
+
+      // Toggle Tag Pills
+      el.tagPills.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-tag]");
+        if (!btn) return;
+        const val = btn.dataset.tag;
+        state.tag = state.tag === val ? null : val;
+        updateAll();
+      });
+
+      // Quick Presets
+      document.querySelectorAll(".preset-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          resetFilters();
+          const preset = btn.dataset.preset;
+          if (preset === "top-chancen") {
+            state.ratings.add("kaufen");
+            state.statuses.add("Bodenbildung");
+            state.statuses.add("Boden abwarten");
+          } else if (preset === "high-conviction") {
+            state.chanceMin = 4;
+            state.wlatarMin = 65;
+            state.wlafarMin = 65;
+          }
+          updateAll();
+        });
+      });
+
+      // Dual Range Sliders
+      ["chance", "risiko", "wlatar", "wlafar"].forEach((key) => {
+        const minInput = document.getElementById(`${key}Min`);
+        const maxInput = document.getElementById(`${key}Max`);
+
+        minInput.addEventListener("input", () => {
+          const val = Number(minInput.value);
+          state[`${key}Min`] = Math.min(val, state[`${key}Max`]);
+          updateAll();
+        });
+
+        maxInput.addEventListener("input", () => {
+          const val = Number(maxInput.value);
+          state[`${key}Max`] = Math.max(val, state[`${key}Min`]);
+          updateAll();
+        });
+      });
+
+      // Table Header Sorting
+      document.querySelectorAll(".sort-header").forEach((th) => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.sort;
+          if (state.sortKey === key) {
+            state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+          } else {
+            state.sortKey = key;
+            state.sortDir = ["chance", "wlatar", "wlafar", "rating"].includes(key) ? "desc" : "asc";
+          }
+          renderTable();
+        });
+      });
+
+      // Mobile / Dropdown Sort
+      el.mobileSortSelect.addEventListener("change", (e) => {
+        const [key, dir] = e.target.value.split("-");
+        state.sortKey = key;
+        state.sortDir = dir;
+        renderTable();
+      });
+
+      // Row Click -> Open Detail Modal
+      el.stockTableBody.addEventListener("click", (e) => {
+        const row = e.target.closest("tr[data-stock-id]");
+        if (!row) return;
+        const id = Number(row.dataset.stockId);
+        const stock = STOCKS.find((s) => s.id === id);
+        if (stock) openStockModal(stock);
+      });
+
+      // Modal Close Handlers
+      el.closeModalBtn.addEventListener("click", () => {
+        el.detailModal.classList.add("hidden");
+        el.detailModal.classList.remove("flex");
+      });
+
+      el.detailModal.addEventListener("click", (e) => {
+        if (e.target === el.detailModal) {
+          el.detailModal.classList.add("hidden");
+          el.detailModal.classList.remove("flex");
+        }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !el.detailModal.classList.contains("hidden")) {
+          el.detailModal.classList.add("hidden");
+          el.detailModal.classList.remove("flex");
+        }
+      });
+    }
+
+    // Initialize Application
+    initEvents();
+    updateAll();
+  </script>
+</body>
+</html>

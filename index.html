@@ -37,7 +37,7 @@
     }
 
     .container {
-      max-width: 1380px;
+      max-width: 1440px;
       margin: 0 auto;
       padding: 24px 20px;
     }
@@ -82,6 +82,29 @@
     .brand p {
       font-size: 13px;
       color: var(--text-secondary);
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-guide {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-secondary);
+      color: #67e8f9;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn-guide:hover {
+      background: rgba(6, 182, 212, 0.14);
     }
 
     .sync-badge {
@@ -150,7 +173,7 @@
       padding: 20px;
       margin-bottom: 24px;
       display: grid;
-      grid-template-columns: 1.3fr 1fr;
+      grid-template-columns: 1.35fr 1fr;
       gap: 24px;
     }
 
@@ -161,7 +184,7 @@
     }
 
     .filter-group {
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .filter-group:last-child {
@@ -174,7 +197,7 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--text-secondary);
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .pill-wrap {
@@ -187,9 +210,9 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       color: var(--text-secondary);
-      padding: 6px 13px;
+      padding: 5px 12px;
       border-radius: 10px;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -268,7 +291,7 @@
       color: var(--text-primary);
       padding: 10px 16px;
       border-radius: 12px;
-      width: 320px;
+      width: 340px;
       max-width: 100%;
       font-size: 14px;
       outline: none;
@@ -304,12 +327,12 @@
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 14px;
+      font-size: 13.5px;
     }
 
     th {
-      padding: 14px 16px;
-      font-size: 12px;
+      padding: 13px 14px;
+      font-size: 11.5px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -325,7 +348,7 @@
     }
 
     td {
-      padding: 14px 16px;
+      padding: 13px 14px;
       border-bottom: 1px solid rgba(38, 51, 77, 0.5);
       white-space: nowrap;
     }
@@ -347,6 +370,16 @@
     .stock-sub {
       font-size: 12px;
       color: var(--text-muted);
+    }
+
+    .pos-val {
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .neg-val {
+      color: #f87171;
+      font-weight: 600;
     }
 
     .badge {
@@ -391,7 +424,7 @@
     }
 
     .score-bar {
-      width: 56px;
+      width: 52px;
       height: 6px;
       background: #1e293b;
       border-radius: 999px;
@@ -419,6 +452,7 @@
       background: var(--accent);
     }
 
+    /* Modals */
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -439,10 +473,12 @@
       background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: 18px;
-      max-width: 680px;
+      max-width: 700px;
       width: 100%;
       padding: 24px;
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     .modal-head {
@@ -450,6 +486,7 @@
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 18px;
+      gap: 12px;
     }
 
     .modal-close {
@@ -461,6 +498,7 @@
       border-radius: 10px;
       cursor: pointer;
       font-size: 16px;
+      flex-shrink: 0;
     }
 
     .metrics-grid {
@@ -468,6 +506,12 @@
       grid-template-columns: repeat(3, 1fr);
       gap: 12px;
       margin-top: 18px;
+    }
+
+    @media (max-width: 600px) {
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+      }
     }
 
     .metric-item {
@@ -495,6 +539,27 @@
       border: 1px solid var(--border);
       border-radius: 12px;
     }
+
+    .guide-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+    }
+
+    .guide-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .guide-step h3 {
+      font-size: 14px;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
   </style>
 </head>
 <body>
@@ -507,9 +572,12 @@
           <p>Automatisierte Trend-, Momentum- &amp; Fundamental-Analyse</p>
         </div>
       </div>
-      <div class="sync-badge">
-        <span class="sync-dot"></span>
-        <span id="lastUpdated">Initialisiere...</span>
+      <div class="header-actions">
+        <button class="btn-guide" id="openGuideBtn">? Anleitung</button>
+        <div class="sync-badge">
+          <span class="sync-dot"></span>
+          <span id="lastUpdated">Initialisiere...</span>
+        </div>
       </div>
     </header>
 
@@ -539,6 +607,10 @@
         <div class="filter-group">
           <div class="filter-title">Handelssignal</div>
           <div class="pill-wrap" id="ratingFilters"></div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-title">Strategie</div>
+          <div class="pill-wrap" id="strategyFilters"></div>
         </div>
         <div class="filter-group">
           <div class="filter-title">Chart-Phase / Status</div>
@@ -580,11 +652,19 @@
           </div>
           <input type="range" id="chanceMin" min="1" max="5" value="1" />
         </div>
+
+        <div class="slider-box">
+          <div class="slider-header">
+            <span>Max. Risiko-Stufe (1–5)</span>
+            <span class="slider-val" id="riskMaxLabel">bis 5</span>
+          </div>
+          <input type="range" id="riskMax" min="1" max="5" value="5" />
+        </div>
       </div>
     </section>
 
     <div class="toolbar">
-      <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Name, Ticker, ISIN oder Land..." />
+      <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Name, Ticker, Strategie, Land..." />
       <button class="btn-reset" id="resetBtn">Filter zurücksetzen</button>
     </div>
 
@@ -597,10 +677,12 @@
             <th data-sort="rating">Signal ↕</th>
             <th data-sort="status">Phase ↕</th>
             <th data-sort="chance">Chance ↕</th>
-            <th data-sort="tech_score">Tech-Score ↕</th>
-            <th data-sort="funda_score">Funda-Score ↕</th>
-            <th data-sort="sector">Sektor ↕</th>
-            <th data-sort="country">Land ↕</th>
+            <th data-sort="risk">Risiko ↕</th>
+            <th data-sort="tech_score">Tech ↕</th>
+            <th data-sort="funda_score">Funda ↕</th>
+            <th data-sort="mom3m">3M % ↕</th>
+            <th data-sort="rsi">RSI ↕</th>
+            <th data-sort="strategy">Strategie ↕</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -608,6 +690,7 @@
     </div>
   </div>
 
+  <!-- Detail Modal -->
   <div class="modal-backdrop" id="modalBackdrop">
     <div class="modal">
       <div class="modal-head">
@@ -617,20 +700,49 @@
         </div>
         <button class="modal-close" id="modalClose">✕</button>
       </div>
-      <canvas id="priceChart" width="620" height="170"></canvas>
+      <canvas id="priceChart" width="640" height="170"></canvas>
       <div class="metrics-grid" id="mMetrics"></div>
+    </div>
+  </div>
+
+  <!-- Tutorial / Anleitung Modal -->
+  <div class="modal-backdrop" id="guideBackdrop">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h2>Kurzanleitung: So nutzt du den Scanner</h2>
+          <p style="color: var(--text-secondary); font-size: 13px;">Schneller Workflow für die tägliche Vorauswahl</p>
+        </div>
+        <button class="modal-close" id="guideClose">✕</button>
+      </div>
+      <div class="guide-list">
+        <div class="guide-step">
+          <h3>1. Signal &amp; Strategie eingrenzen</h3>
+          <p>Starte links mit einem Klick auf <strong>kaufen</strong> oder <strong>Turnaround</strong> bzw. <strong>Wachstum</strong>. Mehrere Pills lassen sich kombinieren.</p>
+        </div>
+        <div class="guide-step">
+          <h3>2. Scores, 3M-Momentum &amp; Risiko abgleichen</h3>
+          <p>Nutze rechts die Regler für <strong>Tech</strong>, <strong>Funda</strong>, <strong>Chance</strong> und <strong>Risiko</strong>. In der Tabelle zeigen <strong>3M %</strong> das Quartals-Momentum und <strong>RSI</strong> die kurzfristige Spannung (unter 30 eher überverkauft, über 70 eher heißgelaufen).</p>
+        </div>
+        <div class="guide-step">
+          <h3>3. Spalten sortieren &amp; Detailansicht öffnen</h3>
+          <p>Klicke auf eine Tabellenüberschrift zum Sortieren und auf eine Zeile, um Kursverlauf, SMA 50/200, Forward KGV und Umsatzwachstum im Detail zu sehen.</p>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
     let allStocks = [];
     let selectedRatings = new Set();
+    let selectedStrategies = new Set();
     let selectedStatuses = new Set();
     let selectedTags = new Set();
     let sortKey = 'tech_score';
     let sortAsc = false;
 
     const RATINGS = ['kaufen', 'halten', 'verkaufen'];
+    const STRATEGIES = ['Wachstum', 'Turnaround', 'Cashflow', 'Dividende'];
     const STATUSES = [
       'Bodenbildung', 'Turnaround', 'Position verwalten',
       'Boden abwarten', 'Dynamikverlust', 'Regression abwarten',
@@ -656,13 +768,18 @@
     function normalizeStock(s) {
       if (!s || typeof s !== 'object') return null;
       const chance = Number(s.chance ?? 3);
+      const risk = Number(s.risk ?? 3);
       const priceNum = Number(s.price);
+      const momNum = Number(s.mom3m);
+      const rsiNum = Number(s.rsi);
       return {
         name: String(s.name || s.ticker || 'Unbekannt'),
         ticker: String(s.ticker || ''),
         isin: String(s.isin || '—'),
+        strategy: String(s.strategy || 'Wachstum'),
         tag: String(s.tag || ''),
         chance: Number.isFinite(chance) ? Math.max(1, Math.min(5, chance)) : 3,
+        risk: Number.isFinite(risk) ? Math.max(1, Math.min(5, risk)) : 3,
         rating: String(s.rating || 'halten'),
         status: String(s.status || 'Underperformance'),
         country: String(s.country || '—'),
@@ -673,8 +790,8 @@
         currency: String(s.currency || ''),
         sma50: s.sma50 ?? '—',
         sma200: s.sma200 ?? '—',
-        rsi: s.rsi ?? '—',
-        mom3m: s.mom3m ?? '—',
+        rsi: s.rsi != null && Number.isFinite(rsiNum) ? rsiNum : null,
+        mom3m: s.mom3m != null && Number.isFinite(momNum) ? momNum : null,
         forwardPE: s.forwardPE ?? '—',
         revGrowth: s.revGrowth ?? null,
         history: Array.isArray(s.history) ? s.history.map(Number).filter(Number.isFinite) : []
@@ -692,7 +809,8 @@
         const json = JSON.parse(text);
         const rawList = Array.isArray(json.stocks) ? json.stocks : (Array.isArray(json) ? json : []);
         allStocks = rawList.map(normalizeStock).filter(Boolean);
-        statusEl.textContent = 'Stand: ' + (json.updated_at || 'Aktuell') + ` · ${allStocks.length} Werte`;
+        const wText = json.weights ? ` · Gewichtung ${Math.round((json.weights.tech ?? 0.6) * 100)}/${Math.round((json.weights.funda ?? 0.4) * 100)}` : '';
+        statusEl.textContent = 'Stand: ' + (json.updated_at || 'Aktuell') + ` · ${allStocks.length} Werte` + wText;
         if (!allStocks.length) {
           showError('Die data.json wurde geladen, enthält aber aktuell keine Einträge.');
         }
@@ -706,41 +824,48 @@
       render();
     }
 
-    function buildFilterPills() {
-      const rWrap = document.getElementById('ratingFilters');
-      rWrap.innerHTML = RATINGS.map(r => {
-        const count = allStocks.filter(s => s.rating === r).length;
-        return `<button class="pill" data-type="rating" data-val="${r}">${r} <span class="count">${count}</span></button>`;
-      }).join('');
-
-      const sWrap = document.getElementById('statusFilters');
-      sWrap.innerHTML = STATUSES.map(st => {
-        const count = allStocks.filter(s => s.status === st).length;
-        return `<button class="pill" data-type="status" data-val="${st}">${st} <span class="count">${count}</span></button>`;
-      }).join('');
-
-      const tags = [...new Set(allStocks.map(s => s.tag).filter(Boolean))];
-      const tWrap = document.getElementById('tagFilters');
-      tWrap.innerHTML = tags.map(t => {
-        const count = allStocks.filter(s => s.tag === t).length;
-        return `<button class="pill" data-type="tag" data-val="${t}">${t} <span class="count">${count}</span></button>`;
-      }).join('');
-
-      document.querySelectorAll('.pill').forEach(btn => {
+    function bindPillClicks(selector, targetSet) {
+      document.querySelectorAll(selector).forEach(btn => {
         btn.addEventListener('click', () => {
-          const type = btn.dataset.type;
           const val = btn.dataset.val;
-          const set = type === 'rating' ? selectedRatings : (type === 'status' ? selectedStatuses : selectedTags);
-          if (set.has(val)) {
-            set.delete(val);
+          if (targetSet.has(val)) {
+            targetSet.delete(val);
             btn.classList.remove('active');
           } else {
-            set.add(val);
+            targetSet.add(val);
             btn.classList.add('active');
           }
           render();
         });
       });
+    }
+
+    function buildFilterPills() {
+      document.getElementById('ratingFilters').innerHTML = RATINGS.map(r => {
+        const count = allStocks.filter(s => s.rating === r).length;
+        return `<button class="pill r-pill" data-val="${r}">${r} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      document.getElementById('strategyFilters').innerHTML = STRATEGIES.map(st => {
+        const count = allStocks.filter(s => s.strategy === st).length;
+        return `<button class="pill stg-pill" data-val="${st}">${st} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      document.getElementById('statusFilters').innerHTML = STATUSES.map(st => {
+        const count = allStocks.filter(s => s.status === st).length;
+        return `<button class="pill st-pill" data-val="${st}">${st} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      const tags = [...new Set(allStocks.map(s => s.tag).filter(Boolean))];
+      document.getElementById('tagFilters').innerHTML = tags.map(t => {
+        const count = allStocks.filter(s => s.tag === t).length;
+        return `<button class="pill tg-pill" data-val="${t}">${t} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      bindPillClicks('.r-pill', selectedRatings);
+      bindPillClicks('.stg-pill', selectedStrategies);
+      bindPillClicks('.st-pill', selectedStatuses);
+      bindPillClicks('.tg-pill', selectedTags);
     }
 
     function render() {
@@ -750,22 +875,26 @@
       const fMin = Math.min(+document.getElementById('fundaMin').value, +document.getElementById('fundaMax').value);
       const fMax = Math.max(+document.getElementById('fundaMin').value, +document.getElementById('fundaMax').value);
       const cMin = +document.getElementById('chanceMin').value;
+      const rMax = +document.getElementById('riskMax').value;
 
       document.getElementById('techRangeLabel').textContent = `${tMin} – ${tMax}`;
       document.getElementById('fundaRangeLabel').textContent = `${fMin} – ${fMax}`;
       document.getElementById('chanceLabel').textContent = `ab ${cMin}`;
+      document.getElementById('riskMaxLabel').textContent = `bis ${rMax}`;
 
       let filtered = allStocks.filter(s => {
         const tech = getTechScore(s);
         const funda = getFundaScore(s);
         if (selectedRatings.size && !selectedRatings.has(s.rating)) return false;
+        if (selectedStrategies.size && !selectedStrategies.has(s.strategy)) return false;
         if (selectedStatuses.size && !selectedStatuses.has(s.status)) return false;
         if (selectedTags.size && !selectedTags.has(s.tag)) return false;
         if (tech < tMin || tech > tMax) return false;
         if (funda < fMin || funda > fMax) return false;
         if (s.chance < cMin) return false;
+        if (s.risk > rMax) return false;
         if (q) {
-          const hay = `${s.name} ${s.ticker} ${s.isin} ${s.country} ${s.sector} ${s.tag}`.toLowerCase();
+          const hay = `${s.name} ${s.ticker} ${s.isin} ${s.country} ${s.sector} ${s.strategy} ${s.tag}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
         return true;
@@ -793,6 +922,8 @@
         const funda = getFundaScore(s);
         const badgeCls = s.rating === 'kaufen' ? 'badge-buy' : (s.rating === 'verkaufen' ? 'badge-sell' : 'badge-hold');
         const dots = [1, 2, 3, 4, 5].map(i => `<span class="dot ${i <= s.chance ? 'filled' : ''}"></span>`).join('');
+        const momCls = s.mom3m != null ? (s.mom3m >= 0 ? 'pos-val' : 'neg-val') : '';
+        const momText = s.mom3m != null ? `${s.mom3m > 0 ? '+' : ''}${s.mom3m}%` : '—';
         return `
           <tr data-idx="${idx}">
             <td>
@@ -803,6 +934,7 @@
             <td><span class="badge ${badgeCls}">${s.rating}</span></td>
             <td><span class="status-chip">${s.status}</span></td>
             <td><div class="chance-dots">${dots}</div></td>
+            <td><strong>${s.risk}/5</strong></td>
             <td>
               <div class="score-bar-wrap">
                 <div class="score-bar"><div class="score-fill" style="width:${tech}%"></div></div>
@@ -815,8 +947,9 @@
                 <strong>${funda}</strong>
               </div>
             </td>
-            <td>${s.sector}</td>
-            <td>${s.country}</td>
+            <td><span class="${momCls}">${momText}</span></td>
+            <td>${s.rsi != null ? s.rsi : '—'}</td>
+            <td>${s.strategy}</td>
           </tr>
         `;
       }).join('');
@@ -831,14 +964,14 @@
       const tech = getTechScore(s);
       const funda = getFundaScore(s);
       document.getElementById('mTitle').textContent = `${s.name} (${s.ticker})`;
-      document.getElementById('mSub').textContent = `${s.sector} · ${s.country} · ISIN: ${s.isin}`;
+      document.getElementById('mSub').textContent = `${s.strategy} · ${s.sector} · ${s.country} · ISIN: ${s.isin}`;
       document.getElementById('mMetrics').innerHTML = `
         <div class="metric-item"><span>Aktueller Kurs</span><strong>${s.price ?? '—'} ${s.currency}</strong></div>
-        <div class="metric-item"><span>Tech-Score / Funda-Score</span><strong>${tech} / ${funda}</strong></div>
-        <div class="metric-item"><span>RSI (14) &amp; 3M-Momentum</span><strong>${s.rsi} / ${s.mom3m}%</strong></div>
+        <div class="metric-item"><span>Tech / Funda Score</span><strong>${tech} / ${funda}</strong></div>
+        <div class="metric-item"><span>Chance / Risiko</span><strong>${s.chance}/5 · Risiko ${s.risk}/5</strong></div>
+        <div class="metric-item"><span>RSI (14) &amp; 3M-Momentum</span><strong>${s.rsi ?? '—'} / ${s.mom3m != null ? s.mom3m + '%' : '—'}</strong></div>
         <div class="metric-item"><span>SMA 50 / SMA 200</span><strong>${s.sma50} / ${s.sma200}</strong></div>
-        <div class="metric-item"><span>Forward KGV</span><strong>${s.forwardPE}</strong></div>
-        <div class="metric-item"><span>Umsatzwachstum</span><strong>${s.revGrowth != null ? s.revGrowth + '%' : '—'}</strong></div>
+        <div class="metric-item"><span>Forward KGV / Umsatz %</span><strong>${s.forwardPE} / ${s.revGrowth != null ? s.revGrowth + '%' : '—'}</strong></div>
       `;
       document.getElementById('modalBackdrop').classList.add('open');
       drawChart(s.history || []);
@@ -873,7 +1006,13 @@
       if (e.target.id === 'modalBackdrop') document.getElementById('modalBackdrop').classList.remove('open');
     };
 
-    ['searchInput', 'techMin', 'techMax', 'fundaMin', 'fundaMax', 'chanceMin'].forEach(id => {
+    document.getElementById('openGuideBtn').onclick = () => document.getElementById('guideBackdrop').classList.add('open');
+    document.getElementById('guideClose').onclick = () => document.getElementById('guideBackdrop').classList.remove('open');
+    document.getElementById('guideBackdrop').onclick = (e) => {
+      if (e.target.id === 'guideBackdrop') document.getElementById('guideBackdrop').classList.remove('open');
+    };
+
+    ['searchInput', 'techMin', 'techMax', 'fundaMin', 'fundaMax', 'chanceMin', 'riskMax'].forEach(id => {
       document.getElementById(id).addEventListener('input', render);
     });
 
@@ -888,6 +1027,7 @@
 
     document.getElementById('resetBtn').addEventListener('click', () => {
       selectedRatings.clear();
+      selectedStrategies.clear();
       selectedStatuses.clear();
       selectedTags.clear();
       document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
@@ -897,6 +1037,7 @@
       document.getElementById('fundaMin').value = 0;
       document.getElementById('fundaMax').value = 100;
       document.getElementById('chanceMin').value = 1;
+      document.getElementById('riskMax').value = 5;
       render();
     });
 

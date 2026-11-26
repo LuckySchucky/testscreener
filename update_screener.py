@@ -1,13 +1,17 @@
 import json
 import math
+import time
 from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# Erweiterte Watchlist & Fokus-Sektoren
-UNIVERSE = [
-    # AI & Cloud Infrastruktur (2030 Fokus)
+# Maximale Anzahl an Tickern pro Lauf (schützt vor GitHub-Action-Timeouts & Rate-Limits)
+MAX_TICKERS = 250
+INCLUDE_SP500 = True
+INCLUDE_DAX = True
+
+CORE_UNIVERSE = [
     {"ticker": "ORCL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "IREN", "strategy": "Turnaround", "tag": "AI Data Center"},
     {"ticker": "CIFR", "strategy": "Turnaround", "tag": "AI Data Center"},
@@ -17,16 +21,12 @@ UNIVERSE = [
     {"ticker": "NVDA", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "MSFT", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "AAPL", "strategy": "Cashflow", "tag": "Big Tech"},
-
-    # Halbleiter & Photonics
     {"ticker": "VLN", "strategy": "Turnaround", "tag": "Semiconductors"},
     {"ticker": "INTC", "strategy": "Turnaround", "tag": "Semiconductors"},
     {"ticker": "AMD", "strategy": "Wachstum", "tag": "Semiconductors"},
     {"ticker": "MU", "strategy": "Wachstum", "tag": "Semiconductors"},
     {"ticker": "ARM", "strategy": "Wachstum", "tag": "Semiconductors"},
     {"ticker": "ASML", "strategy": "Wachstum", "tag": "Semiconductors"},
-
-    # Energie, Speicher & Grid-Engpässe
     {"ticker": "EOSE", "strategy": "Turnaround", "tag": "Energy & Grid"},
     {"ticker": "RUN", "strategy": "Turnaround", "tag": "Energy & Grid"},
     {"ticker": "FLNC", "strategy": "Wachstum", "tag": "Energy & Grid"},
@@ -35,24 +35,16 @@ UNIVERSE = [
     {"ticker": "BTU", "strategy": "Cashflow", "tag": "Energy & Grid"},
     {"ticker": "VST", "strategy": "Wachstum", "tag": "Energy & Grid"},
     {"ticker": "CEG", "strategy": "Wachstum", "tag": "Energy & Grid"},
-
-    # Small Caps / Drohnen / Spezialwerte
     {"ticker": "ZENA", "strategy": "Wachstum", "tag": "Tech & Robotics"},
-
-    # Healthcare & Biotech
     {"ticker": "HIMS", "strategy": "Wachstum", "tag": "Healthcare"},
     {"ticker": "NVO", "strategy": "Wachstum", "tag": "Healthcare"},
     {"ticker": "LLY", "strategy": "Wachstum", "tag": "Healthcare"},
-
-    # Europa & Turnaround-Klassiker
     {"ticker": "RHM.DE", "strategy": "Wachstum", "tag": "Europa & Industrie"},
     {"ticker": "SIE.DE", "strategy": "Dividende", "tag": "Europa & Industrie"},
     {"ticker": "BAS.DE", "strategy": "Dividende", "tag": "Turnaround Watch"},
     {"ticker": "BAYN.DE", "strategy": "Turnaround", "tag": "Turnaround Watch"},
     {"ticker": "PYPL", "strategy": "Turnaround", "tag": "Turnaround Watch"},
     {"ticker": "NKE", "strategy": "Turnaround", "tag": "Turnaround Watch"},
-
-    # Asien / China Tech & Speicherchips
     {"ticker": "BABA", "strategy": "Turnaround", "tag": "Asien & China Tech"},
     {"ticker": "JD", "strategy": "Turnaround", "tag": "Asien & China Tech"},
     {"ticker": "BIDU", "strategy": "Turnaround", "tag": "Asien & China Tech"},
@@ -87,6 +79,44 @@ SECTOR_MAP = {
     "Communication Services": "Kommunikation",
 }
 
+def fetch_index_tickers():
+    extra = []
+    seen = {x["ticker"].upper() for x in CORE_UNIVERSE}
+
+    if INCLUDE_DAX:
+        try:
+            tables = pd.read_html("https://en.wikipedia.org/wiki/DAX")
+            for df in tables:
+                col = next((c for c in df.columns if "ticker" in str(c).lower() or "symbol" in str(c).lower()), None)
+                if col is not None:
+                    for sym in df[col].dropna().astype(str):
+                        sym = sym.strip().replace(".", "-")
+                        if not sym.endswith(".DE"):
+                            sym = f"{sym}.DE"
+                        if sym.upper() not in seen:
+                            seen.add(sym.upper())
+                            extra.append({"ticker": sym, "strategy": "Cashflow", "tag": "DAX"})
+                    break
+        except Exception as e:
+            print(f"DAX-Liste konnte nicht geladen werden: {e}")
+
+    if INCLUDE_SP500:
+        try:
+            tables = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+            for df in tables:
+                if "Symbol" in df.columns:
+                    for sym in df["Symbol"].dropna().astype(str):
+                        sym = sym.strip().replace(".", "-")
+                        if sym.upper() not in seen:
+                            seen.add(sym.upper())
+                            extra.append({"ticker": sym, "strategy": "Wachstum", "tag": "S&P 500"})
+                    break
+        except Exception as e:
+            print(f"S&P-500-Liste konnte nicht geladen werden: {e}")
+
+    combined = CORE_UNIVERSE + extra
+    return combined[:MAX_TICKERS]
+
 def clamp(val, low=0, high=100):
     return int(round(max(low, min(high, val))))
 
@@ -99,7 +129,6 @@ def calc_rsi(series, period=14):
     return float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0
 
 def calc_tech_score(close: pd.Series):
-    """Technisches Rating (0-100): Trendlage, RSI-Zone, Abstand 52W-Hoch, Momentum."""
     price = float(close.iloc[-1])
     sma50 = float(close.rolling(50).mean().iloc[-1])
     sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else sma50
@@ -108,7 +137,6 @@ def calc_tech_score(close: pd.Series):
     rsi = calc_rsi(close)
     mom_3m = (price / float(close.iloc[-63]) - 1) * 100 if len(close) >= 63 else 0.0
 
-    # 1. Trendlage (max 35 Punkte)
     trend_score = 0
     if price > sma200:
         trend_score += 20
@@ -117,7 +145,6 @@ def calc_tech_score(close: pd.Series):
     if sma50 > sma200:
         trend_score += 5
 
-    # 2. RSI-Zone (max 25 Punkte)
     if 42 <= rsi <= 65:
         rsi_score = 25
     elif 30 <= rsi < 42:
@@ -129,11 +156,8 @@ def calc_tech_score(close: pd.Series):
     else:
         rsi_score = 6
 
-    # 3. Abstand zum 52W-Hoch (max 20 Punkte)
     dist_high = (price / high_52w) if high_52w > 0 else 0.5
     high_score = dist_high * 20
-
-    # 4. 3-Monats-Momentum (max 20 Punkte)
     mom_score = max(0, min(20, 10 + mom_3m * 0.5))
 
     score = clamp(trend_score + rsi_score + high_score + mom_score)
@@ -149,20 +173,14 @@ def calc_tech_score(close: pd.Series):
     return score, metrics
 
 def calc_funda_score(info: dict):
-    """Fundamentales Rating (0-100): Umsatzwachstum, ROE, Verschuldung, Bewertung."""
     rev_growth = info.get("revenueGrowth")
     roe = info.get("returnOnEquity")
     debt_to_eq = info.get("debtToEquity")
     forward_pe = info.get("forwardPE")
     profit_margin = info.get("profitMargins")
 
-    # 1. Umsatzwachstum (max 30 Punkte)
-    if rev_growth is None:
-        g_score = 15
-    else:
-        g_score = max(0, min(30, 12 + rev_growth * 80))
+    g_score = 15 if rev_growth is None else max(0, min(30, 12 + rev_growth * 80))
 
-    # 2. Eigenkapitalrendite / Profitabilität (max 30 Punkte)
     if roe is not None:
         roe_score = max(0, min(30, roe * 100))
     elif profit_margin is not None:
@@ -170,7 +188,6 @@ def calc_funda_score(info: dict):
     else:
         roe_score = 14
 
-    # 3. Verschuldungsgrad (max 20 Punkte)
     if debt_to_eq is None:
         d_score = 12
     elif debt_to_eq < 50:
@@ -182,7 +199,6 @@ def calc_funda_score(info: dict):
     else:
         d_score = 3
 
-    # 4. Bewertung / Forward KGV (max 20 Punkte)
     if forward_pe is None or forward_pe <= 0:
         pe_score = 8
     elif forward_pe < 18:
@@ -197,7 +213,6 @@ def calc_funda_score(info: dict):
     return clamp(g_score + roe_score + d_score + pe_score)
 
 def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
-    """Automatische Zuweisung von Chart-Phase & Signal anhand Trendlinien & Unterstützungszonen."""
     p = m["price"]
     s50 = m["sma50"]
     s200 = m["sma200"]
@@ -208,10 +223,7 @@ def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
     total_score = tech_score * 0.55 + funda_score * 0.45
 
     if p < s200 * 0.94 and p < s50 and rsi < 38:
-        if pos_in_range < 0.22:
-            status = "Bodenbildung"
-        else:
-            status = "Trendbruch"
+        status = "Bodenbildung" if pos_in_range < 0.22 else "Trendbruch"
     elif p < s200 and p > s50 and rsi >= 45:
         status = "Turnaround"
     elif p < s200 and pos_in_range < 0.25:
@@ -239,8 +251,11 @@ def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
     return status, rating, chance, risk
 
 def build_dataset():
+    universe = fetch_index_tickers()
+    print(f"Analysiere {len(universe)} Ticker...")
     results = []
-    for item in UNIVERSE:
+
+    for idx, item in enumerate(universe, start=1):
         symbol = item["ticker"]
         try:
             tk = yf.Ticker(symbol)
@@ -249,9 +264,15 @@ def build_dataset():
                 continue
 
             close = hist["Close"].dropna()
-            info = tk.info or {}
-
             tech_score, m = calc_tech_score(close)
+
+            # Fundamentaldaten abrufen (bei großen Listen robust absichern)
+            info = {}
+            try:
+                info = tk.info or {}
+            except Exception:
+                info = {}
+
             funda_score = calc_funda_score(info)
             status, rating, chance, risk = determine_status_and_rating(m, tech_score, funda_score)
 
@@ -287,7 +308,9 @@ def build_dataset():
                 "revGrowth": round(info["revenueGrowth"] * 100, 1) if info.get("revenueGrowth") else None,
                 "history": chart_points,
             })
-            print(f"OK: {symbol} -> {rating} | {status} | Tech={tech_score}, Funda={funda_score}")
+
+            if idx % 25 == 0:
+                time.sleep(1.5)
         except Exception as e:
             print(f"Fehler bei {symbol}: {e}")
 
@@ -298,6 +321,7 @@ def build_dataset():
     }
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+    print(f"Fertig: {len(results)} Werte in data.json gespeichert.")
 
 if __name__ == "__main__":
     build_dataset()

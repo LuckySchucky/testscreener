@@ -60,7 +60,6 @@ CORE_UNIVERSE = [
     {"ticker": "000660.KS", "strategy": "Wachstum", "tag": "Asien & China Tech"},
 ]
 
-# Fester Fallback-Pool, damit auch ohne Index-Scraping viele Werte vorhanden sind
 EXTRA_UNIVERSE = [
     "GOOGL", "AMZN", "META", "TSLA", "AVGO", "QCOM", "TXN", "MRVL", "ANET", "NOW",
     "CRM", "PLTR", "SNOW", "MDB", "DDOG", "NET", "CRWD", "PANW", "UBER", "ABNB",
@@ -74,7 +73,7 @@ EXTRA_UNIVERSE = [
     "SAP.DE", "ALV.DE", "DTE.DE", "MBG.DE", "BMW.DE", "VOW3.DE", "MUV2.DE", "IFX.DE",
     "ADS.DE", "DHL.DE", "DBK.DE", "CBK.DE", "HEN3.DE", "BEI.DE", "FRE.DE", "SHL.DE",
     "ENR.DE", "EOAN.DE", "RWE.DE", "AIR.PA", "MC.PA", "OR.PA", "TTE.PA", "SAN.PA",
-    "NOVO-B.CO", "AZN", "SHEL", "HSBC", "UL", "SONY", "TM", "TSM", "SE", "GRAB"
+    "NOVO-B.CO", "AZN", "SHEL", "HSBC", "UL", "SONY", "TM", "TSM", "SE", "GRAB",
 ]
 
 COUNTRY_MAP = {
@@ -109,14 +108,21 @@ SECTOR_MAP = {
     "Real Estate": "Immobilien",
 }
 
+
 def read_wiki_tables(url: str):
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"}
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (X11; Linux x86_64) "
+                "AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
+            )
+        },
     )
     with urllib.request.urlopen(req, timeout=20) as resp:
         html = resp.read().decode("utf-8", errors="ignore")
     return pd.read_html(html)
+
 
 def extract_symbols_from_tables(tables, suffix="", default_strategy="Wachstum", default_tag="Index"):
     found = []
@@ -141,6 +147,7 @@ def extract_symbols_from_tables(tables, suffix="", default_strategy="Wachstum", 
             break
     return found
 
+
 def load_tickers_txt(path="tickers.txt"):
     if not os.path.exists(path):
         return []
@@ -152,6 +159,7 @@ def load_tickers_txt(path="tickers.txt"):
                 continue
             items.append({"ticker": sym, "strategy": "Wachstum", "tag": "Eigene Liste"})
     return items
+
 
 def build_universe():
     universe = list(CORE_UNIVERSE)
@@ -195,8 +203,10 @@ def build_universe():
     print(f"Gesamt-Universum vor Limit: {len(universe)} (Limit: {MAX_TICKERS})")
     return universe[:MAX_TICKERS]
 
+
 def clamp(val, low=0, high=100):
     return int(round(max(low, min(high, val))))
+
 
 def calc_rsi(series, period=14):
     delta = series.diff()
@@ -205,6 +215,7 @@ def calc_rsi(series, period=14):
     rs = gain / loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
     return float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0
+
 
 def calc_tech_score(close: pd.Series):
     price = float(close.iloc[-1])
@@ -250,6 +261,7 @@ def calc_tech_score(close: pd.Series):
     }
     return score, metrics
 
+
 def calc_funda_score(info: dict):
     rev_growth = info.get("revenueGrowth")
     roe = info.get("returnOnEquity")
@@ -290,6 +302,7 @@ def calc_funda_score(info: dict):
 
     return clamp(g_score + roe_score + d_score + pe_score)
 
+
 def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
     p = m["price"]
     s50 = m["sma50"]
@@ -329,6 +342,7 @@ def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
 
     return status, rating, chance, risk
 
+
 def build_dataset():
     universe = build_universe()
     print(f"Starte Analyse für {len(universe)} Ticker...")
@@ -362,5 +376,48 @@ def build_dataset():
             raw_country = info.get("country", "United States")
             raw_sector = info.get("sector", "Technology")
 
-            results.append({
-                "name": info.get("shortName") or info.
+            results.append(
+                {
+                    "name": info.get("shortName") or info.get("longName") or symbol,
+                    "ticker": symbol,
+                    "isin": info.get("isin") or "—",
+                    "strategy": item["strategy"],
+                    "tag": item["tag"],
+                    "chance": chance,
+                    "risk": risk,
+                    "rating": rating,
+                    "status": status,
+                    "country": COUNTRY_MAP.get(raw_country, raw_country),
+                    "sector": SECTOR_MAP.get(raw_sector, raw_sector),
+                    "tech_score": tech_score,
+                    "funda_score": funda_score,
+                    "price": m["price"],
+                    "currency": info.get("currency", "USD"),
+                    "sma50": m["sma50"],
+                    "sma200": m["sma200"],
+                    "rsi": m["rsi"],
+                    "mom3m": m["mom3m"],
+                    "forwardPE": round(info["forwardPE"], 1) if info.get("forwardPE") else None,
+                    "revGrowth": round(info["revenueGrowth"] * 100, 1) if info.get("revenueGrowth") else None,
+                    "history": chart_points,
+                }
+            )
+
+            if idx % 30 == 0:
+                time.sleep(1.0)
+        except Exception as e:
+            print(f"Fehler bei {symbol}: {e}")
+
+    payload = {
+        "updated_at": datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC"),
+        "count": len(results),
+        "weights": {"tech": TECH_WEIGHT, "funda": FUNDA_WEIGHT},
+        "stocks": results,
+    }
+    with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    print(f"Fertig: {len(results)} Werte in data.json gespeichert.")
+
+
+if __name__ == "__main__":
+    build_dataset()

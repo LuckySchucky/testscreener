@@ -11,6 +11,10 @@ MAX_TICKERS = 250
 INCLUDE_SP500 = True
 INCLUDE_DAX = True
 
+# Score-Gewichtung für Gesamtwertung, Signal & Chance (Summe = 1.0)
+TECH_WEIGHT = 0.60
+FUNDA_WEIGHT = 0.40
+
 CORE_UNIVERSE = [
     {"ticker": "ORCL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "IREN", "strategy": "Turnaround", "tag": "AI Data Center"},
@@ -220,7 +224,8 @@ def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
     low52 = m["low52w"]
     high52 = m["high52w"]
     pos_in_range = (p - low52) / max(0.01, (high52 - low52))
-    total_score = tech_score * 0.55 + funda_score * 0.45
+    weight_sum = max(0.01, TECH_WEIGHT + FUNDA_WEIGHT)
+    total_score = (tech_score * TECH_WEIGHT + funda_score * FUNDA_WEIGHT) / weight_sum
 
     if p < s200 * 0.94 and p < s50 and rsi < 38:
         status = "Bodenbildung" if pos_in_range < 0.22 else "Trendbruch"
@@ -252,7 +257,7 @@ def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
 
 def build_dataset():
     universe = fetch_index_tickers()
-    print(f"Analysiere {len(universe)} Ticker...")
+    print(f"Analysiere {len(universe)} Ticker (Gewichtung Tech={TECH_WEIGHT:.0%}, Funda={FUNDA_WEIGHT:.0%})...")
     results = []
 
     for idx, item in enumerate(universe, start=1):
@@ -306,21 +311,3 @@ def build_dataset():
                 "forwardPE": round(info["forwardPE"], 1) if info.get("forwardPE") else None,
                 "revGrowth": round(info["revenueGrowth"] * 100, 1) if info.get("revenueGrowth") else None,
                 "history": chart_points,
-            })
-
-            if idx % 25 == 0:
-                time.sleep(1.5)
-        except Exception as e:
-            print(f"Fehler bei {symbol}: {e}")
-
-    payload = {
-        "updated_at": datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC"),
-        "count": len(results),
-        "stocks": results,
-    }
-    with open("data.json", "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-    print(f"Fertig: {len(results)} Werte in data.json gespeichert.")
-
-if __name__ == "__main__":
-    build_dataset()

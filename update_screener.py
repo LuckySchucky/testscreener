@@ -9,7 +9,7 @@ import pandas as pd
 import yfinance as yf
 
 # Limit für Ticker pro Lauf (bei GitHub Actions z. B. 250–350 testen)
-MAX_TICKERS = 300
+MAX_TICKERS = 500
 
 INCLUDE_DAX = True
 INCLUDE_MDAX = True

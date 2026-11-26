@@ -19,21 +19,42 @@ TECH_WEIGHT = 0.60
 FUNDA_WEIGHT = 0.40
 
 CORE_UNIVERSE = [
+    {"ticker": "SMSN.IL", "name": "Samsung Electronics (GDR)", "isin": "US7960508882", "strategy": "Cashflow", "tag": "Fokus-Liste"},
+    {"ticker": "CLS", "name": "Celestica Inc.", "isin": "CA15101Q2071", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "CRDO", "name": "Credo Technology Group Holding Ltd", "isin": "KYG254571055", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "CIEN", "name": "Ciena Corp", "isin": "US1717793095", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "TER", "name": "Teradyne Inc.", "isin": "US8807701029", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "ENR.DE", "name": "Siemens Energy AG", "isin": "DE000ENER6Y0", "strategy": "Turnaround", "tag": "Fokus-Liste"},
+    {"ticker": "COHR", "name": "Coherent Corp.", "isin": "US19247G1076", "strategy": "Turnaround", "tag": "Fokus-Liste"},
+    {"ticker": "VIAV", "name": "Viavi Solutions Inc.", "isin": "US9255501051", "strategy": "Turnaround", "tag": "Fokus-Liste"},
+    {"ticker": "MU", "name": "Micron Technology Inc.", "isin": "US5951121038", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "VRT", "name": "Vertiv Holdings Co.", "isin": "US92537N1081", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "AEHR", "name": "Aehr Test Systems", "isin": "US00760J1088", "strategy": "Turnaround", "tag": "Fokus-Liste"},
+    {"ticker": "GE", "name": "GE Aerospace", "isin": "US3696043013", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "LLY", "name": "Eli Lilly and Company", "isin": "US5324571083", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "AXON", "name": "Axon Enterprise Inc.", "isin": "US05464C1018", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "CRWD", "name": "Crowdstrike Holdings Inc", "isin": "US22788C1053", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "META", "name": "Meta Platforms Inc", "isin": "US30303M1027", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "GEV", "name": "GE Vernova", "isin": "US36828A1016", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "PLTR", "name": "Palantir Technologies Inc.", "isin": "US69608A1088", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "AMZN", "name": "Amazon", "isin": "US0231351067", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "GOOG", "name": "Alphabet Inc. (Class C)", "isin": "US02079K1079", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "ASML", "name": "ASML", "isin": "NL0010273215", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "NVDA", "name": "NVIDIA Corp.", "isin": "US67066G1040", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "AVGO", "name": "Broadcom Inc.", "isin": "US11135F1012", "strategy": "Wachstum", "tag": "Fokus-Liste"},
+    {"ticker": "TSM", "name": "Taiwan Semiconductor Manufacturing (ADR)", "isin": "US8740391003", "strategy": "Wachstum", "tag": "Fokus-Liste"},
     {"ticker": "ORCL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "IREN", "strategy": "Turnaround", "tag": "AI Data Center"},
     {"ticker": "CIFR", "strategy": "Turnaround", "tag": "AI Data Center"},
     {"ticker": "DELL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "HPE", "strategy": "Cashflow", "tag": "AI Data Center"},
     {"ticker": "SMCI", "strategy": "Turnaround", "tag": "AI Data Center"},
-    {"ticker": "NVDA", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "MSFT", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
     {"ticker": "AAPL", "strategy": "Cashflow", "tag": "Big Tech"},
     {"ticker": "VLN", "strategy": "Turnaround", "tag": "Semiconductors"},
     {"ticker": "INTC", "strategy": "Turnaround", "tag": "Semiconductors"},
     {"ticker": "AMD", "strategy": "Wachstum", "tag": "Semiconductors"},
-    {"ticker": "MU", "strategy": "Wachstum", "tag": "Semiconductors"},
     {"ticker": "ARM", "strategy": "Wachstum", "tag": "Semiconductors"},
-    {"ticker": "ASML", "strategy": "Wachstum", "tag": "Semiconductors"},
     {"ticker": "EOSE", "strategy": "Turnaround", "tag": "Energy & Grid"},
     {"ticker": "RUN", "strategy": "Turnaround", "tag": "Energy & Grid"},
     {"ticker": "FLNC", "strategy": "Wachstum", "tag": "Energy & Grid"},
@@ -45,7 +66,6 @@ CORE_UNIVERSE = [
     {"ticker": "ZENA", "strategy": "Wachstum", "tag": "Tech & Robotics"},
     {"ticker": "HIMS", "strategy": "Wachstum", "tag": "Healthcare"},
     {"ticker": "NVO", "strategy": "Wachstum", "tag": "Healthcare"},
-    {"ticker": "LLY", "strategy": "Wachstum", "tag": "Healthcare"},
     {"ticker": "RHM.DE", "strategy": "Wachstum", "tag": "Europa & Industrie"},
     {"ticker": "SIE.DE", "strategy": "Dividende", "tag": "Europa & Industrie"},
     {"ticker": "BAS.DE", "strategy": "Dividende", "tag": "Turnaround Watch"},
@@ -397,12 +417,14 @@ def build_dataset():
 
             raw_country = info.get("country", "United States")
             raw_sector = info.get("sector", "Technology")
+            resolved_name = item.get("name") or info.get("shortName") or info.get("longName") or symbol
+            resolved_isin = item.get("isin") or info.get("isin") or "—"
 
             results.append(
                 {
-                    "name": info.get("shortName") or info.get("longName") or symbol,
+                    "name": resolved_name,
                     "ticker": symbol,
-                    "isin": info.get("isin") or "—",
+                    "isin": resolved_isin,
                     "strategy": item["strategy"],
                     "tag": item["tag"],
                     "chance": chance,

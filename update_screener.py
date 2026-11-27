@@ -200,3 +200,217 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
     volume = hist["Volume"].dropna() if "Volume" in hist else pd.Series(dtype=float)
 
     if len(close) < 65:
+        return None
+
+    price = float(close.iloc[-1])
+    high_52w = float(close.max())
+    dist_52w = ((price - high_52w) / high_52w) * 100.0 if high_52w > 0 else 0.0
+
+    price_3m_ago = float(close.iloc[-63]) if len(close) >= 63 else float(close.iloc[0])
+    ret_3m = ((price - price_3m_ago) / price_3m_ago) * 100.0 if price_3m_ago > 0 else 0.0
+    rs_3m = ret_3m - sp500_3m_ret
+
+    sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else price
+    sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else sma50
+    sma20 = float(close.rolling(20).mean().iloc[-1]) if len(close) >= 20 else price
+    rsi = compute_rsi(close, 14)
+
+    avg_vol_20 = float(volume.tail(20).mean()) if len(volume) >= 20 else 0.0
+
+    tech_score = 0
+    if price > sma50:
+        tech_score += 25
+    if price > sma200:
+        tech_score += 25
+    if sma50 > sma200:
+        tech_score += 10
+    if rs_3m > 0:
+        tech_score += min(20, int(rs_3m * 1.2))
+    if 45 <= rsi <= 68:
+        tech_score += 10
+    elif 30 <= rsi < 45:
+        tech_score += 5
+    if dist_52w >= -15:
+        tech_score += 10
+    tech_score = max(0, min(100, tech_score))
+
+    rev_growth = info.get("revenueGrowth") if info else None
+    roe = info.get("returnOnEquity") if info else None
+    profit_margin = info.get("profitMargins") if info else None
+    fwd_pe = info.get("forwardPE") if info else None
+    debt_eq = info.get("debtToEquity") if info else None
+    div_yield = info.get("dividendYield") if info else None
+
+    if not info:
+        funda_score = 50
+    else:
+        funda_score = 45
+        if isinstance(rev_growth, (int, float)):
+            if rev_growth > 0.20:
+                funda_score += 20
+            elif rev_growth > 0.08:
+                funda_score += 12
+            elif rev_growth > 0:
+                funda_score += 5
+            else:
+                funda_score -= 10
+
+        if isinstance(roe, (int, float)):
+            if roe > 0.18:
+                funda_score += 15
+            elif roe > 0.08:
+                funda_score += 8
+            elif roe < 0:
+                funda_score -= 10
+
+        if isinstance(profit_margin, (int, float)):
+            if profit_margin > 0.15:
+                funda_score += 15
+            elif profit_margin > 0.05:
+                funda_score += 8
+            elif profit_margin < 0:
+                funda_score -= 8
+
+        if isinstance(fwd_pe, (int, float)) and 0 < fwd_pe < 25:
+            funda_score += 10
+
+        if isinstance(debt_eq, (int, float)) and debt_eq > 200:
+            funda_score -= 10
+
+        funda_score = max(0, min(100, funda_score))
+
+    total_score = round(tech_score * 0.6 + funda_score * 0.4, 1)
+
+    if price > sma50 and price > sma200 and rs_3m > 5 and rsi <= 72:
+        status = "Position verwalten"
+    elif price > sma50 and price <= sma200:
+        status = "Turnaround"
+    elif price <= sma50 and price > sma200 and rsi < 45:
+        status = "Regression abwarten"
+    elif price <= sma50 and price > sma200:
+        status = "Dynamikverlust"
+    elif price < sma200 and dist_52w < -25 and rsi >= 42 and price > sma20:
+        status = "Bodenbildung"
+    elif price < sma50 and price < sma200 and dist_52w < -20:
+        status = "Boden abwarten"
+    elif price < sma200 and rs_3m < -10:
+        status = "Trendbruch"
+    else:
+        status = "Underperformance"
+
+    if isinstance(div_yield, (int, float)) and div_yield >= 0.032:
+        strategy = "Dividende"
+    elif dist_52w <= -25 and funda_score >= 55:
+        strategy = "Turnaround"
+    elif isinstance(profit_margin, (int, float)) and profit_margin >= 0.18 and (not isinstance(rev_growth, (int, float)) or rev_growth < 0.12):
+        strategy = "Cashflow"
+    else:
+        strategy = "Wachstum"
+
+    if total_score >= 60 and price > sma50 and status in ("Position verwalten", "Turnaround", "Bodenbildung"):
+        rating = "kaufen"
+    elif total_score < 38 or status == "Trendbruch":
+        rating = "verkaufen"
+    else:
+        rating = "halten"
+
+    chance = max(1, min(5, math.ceil(total_score / 20)))
+
+    daily_vol = float(close.pct_change().dropna().std() * np.sqrt(252) * 100)
+    if daily_vol < 25:
+        risk = 2
+    elif daily_vol < 40:
+        risk = 3
+    elif daily_vol < 60:
+        risk = 4
+    else:
+        risk = 5
+
+    name = info.get("shortName") or info.get("longName") or sym
+    currency = info.get("currency") or ("EUR" if sym.endswith((".DE", ".PA")) else "USD")
+    sector = info.get("sector") or "Sonstige"
+    country = info.get("country") or ("Germany" if sym.endswith(".DE") else ("France" if sym.endswith(".PA") else "USA"))
+    isin = info.get("isin") or "—"
+    tag = "Fokus-Liste" if sym in core_set else (sector if sector != "Sonstige" else "")
+
+    history_pts = [round(float(x), 2) for x in close.tail(60).tolist()]
+
+    return {
+        "ticker": sym,
+        "name": name,
+        "isin": isin,
+        "tag": tag,
+        "strategy": strategy,
+        "rating": rating,
+        "status": status,
+        "country": country,
+        "sector": sector,
+        "currency": currency,
+        "price": round(price, 2),
+        "sma50": round(sma50, 2),
+        "sma200": round(sma200, 2),
+        "high52w": round(high_52w, 2),
+        "distHighPct": round(dist_52w, 1),
+        "chance": chance,
+        "risk": risk,
+        "tech_score": tech_score,
+        "funda_score": funda_score,
+        "total_score": total_score,
+        "mom3m": round(ret_3m, 1),
+        "rs3m": round(rs_3m, 1),
+        "rsi": rsi,
+        "avgVolume": int(avg_vol_20),
+        "forwardPE": round(float(fwd_pe), 1) if isinstance(fwd_pe, (int, float)) and fwd_pe > 0 else "—",
+        "revGrowth": round(float(rev_growth) * 100, 1) if isinstance(rev_growth, (int, float)) else None,
+        "history": history_pts,
+    }
+
+
+def main():
+    tickers = build_ticker_universe()
+    core_set = set(CORE_UNIVERSE)
+
+    history_map = download_history_batches(tickers)
+    print(f"Gültige Kursreihen geladen: {len(history_map)}")
+
+    sp500_hist = history_map.get("^GSPC")
+    if sp500_hist is not None and len(sp500_hist["Close"]) >= 63:
+        sp_c = sp500_hist["Close"].dropna()
+        sp500_3m_ret = ((float(sp_c.iloc[-1]) - float(sp_c.iloc[-63])) / float(sp_c.iloc[-63])) * 100.0
+    else:
+        sp500_3m_ret = 0.0
+
+    valid_symbols = [s for s in tickers if s in history_map]
+
+    info_map = {}
+    with ThreadPoolExecutor(max_workers=INFO_WORKERS) as executor:
+        futures = {executor.submit(fetch_info_single, sym): sym for sym in valid_symbols}
+        for idx, future in enumerate(as_completed(futures), 1):
+            sym, info = future.result()
+            info_map[sym] = info
+            if idx % 100 == 0:
+                print(f"Fundamentaldaten geladen: {idx}/{len(valid_symbols)}")
+
+    results = []
+    for sym in valid_symbols:
+        item = score_stock(sym, history_map[sym], info_map.get(sym, {}), sp500_3m_ret, core_set)
+        if item is not None:
+            results.append(item)
+
+    results.sort(key=lambda x: (x["tag"] == "Fokus-Liste", x["total_score"]), reverse=True)
+
+    payload = {
+        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "benchmark_mom3m": round(sp500_3m_ret, 1),
+        "count": len(results),
+        "stocks": results,
+    }
+
+    with open("data.json", "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    print(f"Fertig! {len(results)} Aktien in data.json gespeichert.")
+
+
+if __name__ == "__main__":
+    main()

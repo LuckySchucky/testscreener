@@ -21,6 +21,24 @@ CORE_UNIVERSE = [
     "COHR", "AMBA", "ENR.DE", "RHM.DE", "SU.PA", "005930.KS", "000660.KS"
 ]
 
+# Zusätzlicher liquider Pool (US/EU/Sektor-Werte), falls Wikipedia-Listen < 1.000 liefern
+EXTRA_UNIVERSE = [
+    "NBIS", "HIMS", "RKLB", "RDW", "BTDR", "CLSK", "MARA", "RIOT", "SMCI",
+    "ARM", "MRVL", "AVGO", "TSM", "ASML", "SMH", "SOXL", "PLTR", "APP",
+    "SNOW", "DDOG", "NET", "MDB", "COIN", "HOOD", "DKNG", "SOFI", "UPST",
+    "AFRM", "CELH", "ONON", "DECK", "CAVA", "DUOL", "UBER", "ABNB", "DASH",
+    "SHOP", "MELI", "NU", "SE", "GRAB", "BABA", "PDD", "JD", "BIDU",
+    "BE", "HPE", "ZM", "BBY", "MLTX", "BBIO", "VRTX", "CHTR", "VKTX",
+    "NVO", "SNDK", "TE", "CISS", "FTK", "METC", "KSS", "TMDX", "OKLO",
+    "SMR", "CCJ", "UEC", "UUUU", "LEU", "VST", "CEG", "NRG", "TLN",
+    "EQNR", "SHEL", "TTE", "BP", "XOM", "CVX", "OXY", "SLB", "HAL",
+    "SIE.DE", "SAP.DE", "ALV.DE", "MUV2.DE", "DTE.DE", "IFX.DE", "MBG.DE",
+    "BMW.DE", "VOW3.DE", "BAS.DE", "BAYN.DE", "AIR.PA", "MC.PA", "OR.PA",
+    "SAN.PA", "RMS.PA", "KER.PA", "AI.PA", "DG.PA", "BNP.PA", "CS.PA",
+    "HAG.DE", "NDA.DE", "AFX.DE", "EVD.DE", "KRN.DE", "LEG.DE", "P911.DE",
+    "DHER.DE", "HFG.DE", "TMV.DE", "SGL.DE", "WAF.DE", "SZG.DE", "G1A.DE"
+]
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
@@ -88,7 +106,7 @@ def build_ticker_universe() -> list[str]:
     combined = []
     seen = set()
 
-    for sym in CORE_UNIVERSE + sp500 + nasdaq100 + russell1000 + dax + mdax + sdax + cac40:
+    for sym in CORE_UNIVERSE + sp500 + nasdaq100 + russell1000 + dax + mdax + sdax + cac40 + EXTRA_UNIVERSE:
         if sym and sym not in seen:
             seen.add(sym)
             combined.append(sym)
@@ -373,7 +391,7 @@ def main():
     core_set = set(CORE_UNIVERSE)
 
     history_map = download_history_batches(tickers)
-    print(f"Gültige Kursreihen geladen: {len(history_map)}")
+    print(f"Gültige Kursreihen geladen: {len(history_map)} / {len(tickers)}")
 
     sp500_hist = history_map.get("^GSPC")
     if sp500_hist is not None and len(sp500_hist["Close"]) >= 63:

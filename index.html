@@ -703,7 +703,7 @@
           <div class="pill-wrap" id="strategyFilters"></div>
         </div>
         <div class="filter-group">
-          <div class="filter-title">Chart-Phase / Status</div>
+          <div class="filter-title">Chart-Phase / Trendbild</div>
           <div class="pill-wrap" id="statusFilters"></div>
         </div>
         <div class="filter-group">
@@ -754,7 +754,7 @@
             <span>Mindest-Volumen (20T Ø Aktien/Tag)</span>
             <span class="slider-val" id="volLabel">alle</span>
           </div>
-          <div class="slider-desc">Liquiditätsfilter gegen enge Spreads – für Hebel-/Swing-Setups idealerweise ab 500 Tsd.–1 Mio.</div>
+          <div class="slider-desc">Liquiditätsfilter gegen weite Spreads – für Hebel-/Swing-Setups idealerweise ab 500 Tsd.–1 Mio.</div>
           <input type="range" id="volMin" min="0" max="5000000" step="100000" value="0" />
         </div>
       </div>
@@ -775,7 +775,7 @@
             <th data-sort="name">Unternehmen ↕</th>
             <th data-sort="price">Kurs ↕</th>
             <th data-sort="rating">Signal ↕</th>
-            <th data-sort="status">Phase ↕</th>
+            <th data-sort="status">Chart-Phase ↕</th>
             <th data-sort="chance">Chance ↕</th>
             <th data-sort="tech_score" title="Timing & Trendstärke (SMA 50/200, RS 3M, RSI)">Tech (Timing) ↕</th>
             <th data-sort="funda_score" title="Unternehmensqualität (Wachstum, Marge, ROE, KGV)">Funda (Qualität) ↕</th>
@@ -812,7 +812,7 @@
       <div class="modal-head">
         <div>
           <h2>Kurzanleitung &amp; Score-Matrix</h2>
-          <p style="color: var(--text-secondary); font-size: 13px;">So liest du Tech-Score und Funda-Score für deinen Einstieg</p>
+          <p style="color: var(--text-secondary); font-size: 13px;">So liest du Tech-Score, Funda-Score und Chart-Phasen</p>
         </div>
         <button class="modal-close" id="guideClose">✕</button>
       </div>
@@ -830,7 +830,7 @@
             </div>
             <div class="matrix-card">
               <strong>Tech ≥ 70 &amp; Funda &lt; 55 · Reines Momentum</strong>
-              Läuft technisch heiß ohne starke Bilanzdaten – nur kurzfristig und mit engem Stopp handeln.
+              Läuft technisch heiß ohne hohe Fundamental-Deckung – nur kurzfristig und mit engem Stopp handeln.
             </div>
             <div class="matrix-card">
               <strong>Tech &lt; 50 &amp; Funda &lt; 55 · Kein Setup</strong>
@@ -839,12 +839,14 @@
           </div>
         </div>
         <div class="guide-step">
-          <h3>2. Morgen-Routine für Swing- &amp; Hebel-Kandidaten</h3>
-          <p>Starte mit <strong>kaufen</strong> oder <strong>Turnaround</strong>, aktiviere <strong>Nur Outperformer (RS 3M &gt; 0)</strong> und setze das <strong>Mindest-Volumen</strong> hoch, um liquide Werte mit sauberer Trendbestätigung herauszufiltern.</p>
+          <h3>2. Die wichtigsten Chart-Phasen für Swing-Setups</h3>
+          <p><strong>Starker Aufwärtstrend:</strong> Läuft sauber über SMA 50 &amp; 200 – für Neueinstiege nicht hinterherrennen, sondern kurzen Rücksetzer abwarten.<br/>
+          <strong>Gesunder Rücksetzer:</strong> Langfristiger Trend (SMA 200) intakt, Kurs holt nur kurz Luft unter dem SMA 50 – spannender Rebound-Kandidat.<br/>
+          <strong>Erster Ausbruch:</strong> Springt frisch über den SMA 50 – früher Trendwechsel.</p>
         </div>
         <div class="guide-step">
-          <h3>3. Detailcheck vor der Order</h3>
-          <p>Klicke auf eine Zeile für das automatische Setup-Fazit, den 60-Tage-Verlauf, SMA 50/200, Abstand zum 52W-Hoch und das Durchschnittsvolumen.</p>
+          <h3>3. Morgen-Routine</h3>
+          <p>Filtere nach <strong>kaufen</strong> oder <strong>Gesunder Rücksetzer / Erster Ausbruch</strong>, aktiviere <strong>Nur Outperformer (RS 3M &gt; 0)</strong> und prüfe im Detail-Fenster SMA 50/200 sowie das Volumen.</p>
         </div>
       </div>
     </div>
@@ -863,9 +865,9 @@
     const RATINGS = ['kaufen', 'halten', 'verkaufen'];
     const STRATEGIES = ['Wachstum', 'Turnaround', 'Cashflow', 'Dividende'];
     const STATUSES = [
-      'Bodenbildung', 'Turnaround', 'Position verwalten',
-      'Boden abwarten', 'Dynamikverlust', 'Regression abwarten',
-      'Trendbruch', 'Underperformance'
+      'Starker Aufwärtstrend', 'Erster Ausbruch', 'Boden-Check',
+      'Gesunder Rücksetzer', 'Trend-Abkühlung',
+      'Korrektur / Abwärtstrend', 'Klarer Abwärtstrend', 'Seitwärts / Schwach'
     ];
 
     function getTechScore(s) {
@@ -947,7 +949,7 @@
         chance: Number.isFinite(chance) ? Math.max(1, Math.min(5, chance)) : 3,
         risk: Number.isFinite(risk) ? Math.max(1, Math.min(5, risk)) : 3,
         rating: String(s.rating || 'halten'),
-        status: String(s.status || 'Underperformance'),
+        status: String(s.status || 'Seitwärts / Schwach'),
         country: String(s.country || '—'),
         sector: String(s.sector || '—'),
         tech_score: getTechScore(s),

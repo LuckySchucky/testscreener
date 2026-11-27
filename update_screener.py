@@ -11,14 +11,14 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-MAX_TICKERS = 500
+MAX_TICKERS = 900
 BATCH_SIZE = 100
 INFO_WORKERS = 8
 
 CORE_UNIVERSE = [
-    "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "DFLI", "BTU", "NVVE",
+    "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "BTU", "NVVE",
     "DELL", "INTC", "AAPL", "VRT", "CLS", "CRWD", "LLY", "NVDA", "MU",
-    "COHR", "AMBA", "ENR.DE", "SU.PA", "005930.KS", "000660.KS"
+    "COHR", "AMBA", "ENR.DE", "RHM.DE", "SU.PA", "005930.KS", "000660.KS"
 ]
 
 HEADERS = {
@@ -61,9 +61,9 @@ def extract_symbols_from_tables(url: str, suffix: str = "") -> list[str]:
                 if not sym or sym in ("NAN", "NONE", "-"):
                     continue
                 if suffix == ".DE":
-                    sym = sym.replace(".DE", "") + ".DE"
+                    sym = sym.split(":")[-1].strip().replace(".DE", "") + ".DE"
                 elif suffix == ".PA":
-                    sym = sym.replace(".PA", "") + ".PA"
+                    sym = sym.split(":")[-1].strip().replace(".PA", "") + ".PA"
                 else:
                     if "." in sym and not sym.endswith((".DE", ".PA", ".KS", ".L", ".SW")):
                         sym = sym.replace(".", "-")

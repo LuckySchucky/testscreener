@@ -1,207 +1,1111 @@
-import json
-import math
-import random
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
-from io import StringIO
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlphaPulse — Aktien-Scanner</title>
+  <style>
+    :root {
+      --bg-main: #0b1120;
+      --bg-surface: #111827;
+      --bg-card: #162033;
+      --bg-hover: #1e293b;
+      --border: #26334d;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #10b981;
+      --accent-glow: rgba(16, 185, 129, 0.18);
+      --accent-secondary: #06b6d4;
+      --buy: #10b981;
+      --hold: #f59e0b;
+      --sell: #ef4444;
+    }
 
-import numpy as np
-import pandas as pd
-import requests
-import yfinance as yf
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
 
-MAX_TICKERS = 500
-BATCH_SIZE = 100
-INFO_WORKERS = 8
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-primary);
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
 
-CORE_UNIVERSE = [
-    "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "DFLI", "BTU", "NVVE",
-    "DELL", "INTC", "AAPL", "VRT", "CLS", "CRWD", "LLY", "NVDA", "MU",
-    "COHR", "AMBA", "ENR.DE", "SU.PA", "005930.KS", "000660.KS"
-]
+    .container {
+      max-width: 1460px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
 
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
 
-def fetch_wiki_tables(url: str):
-    resp = requests.get(url, headers=HEADERS, timeout=20)
-    resp.raise_for_status()
-    return pd.read_html(StringIO(resp.text))
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      color: #06281e;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
 
+    .brand h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
 
-def extract_symbols_from_tables(url: str, suffix: str = "") -> list[str]:
-    try:
-        tables = fetch_wiki_tables(url)
-    except Exception as e:
-        print(f"Fehler beim Laden von {url}: {e}")
-        return []
+    .brand p {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
 
-    best_symbols = []
-    candidate_cols = ["Symbol", "Ticker", "Ticker symbol", "WKN / Symbol", "Epic"]
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
 
-    for df in tables:
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [" ".join([str(c) for c in col]).strip() for col in df.columns]
+    .btn-guide {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-secondary);
+      color: #67e8f9;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
 
-        matched_col = None
-        for col in df.columns:
-            col_str = str(col).strip()
-            if any(c.lower() == col_str.lower() or c.lower() in col_str.lower() for c in candidate_cols):
-                matched_col = col
-                break
+    .btn-guide:hover {
+      background: rgba(6, 182, 212, 0.14);
+    }
 
-        if matched_col is not None and len(df) >= 15:
-            raw_vals = df[matched_col].dropna().astype(str).tolist()
-            cleaned = []
-            for sym in raw_vals:
-                sym = sym.split("[")[0].strip().upper()
-                if not sym or sym in ("NAN", "NONE", "-"):
-                    continue
-                if suffix == ".DE":
-                    sym = sym.replace(".DE", "") + ".DE"
-                elif suffix == ".PA":
-                    sym = sym.replace(".PA", "") + ".PA"
-                else:
-                    if "." in sym and not sym.endswith((".DE", ".PA", ".KS", ".L", ".SW")):
-                        sym = sym.replace(".", "-")
-                cleaned.append(sym)
+    .sync-badge {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-            if len(cleaned) > len(best_symbols):
-                best_symbols = cleaned
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
 
-    print(f"{url} -> {len(best_symbols)} Ticker extrahiert")
-    return best_symbols
+    .error-box {
+      display: none;
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fecaca;
+      padding: 14px 18px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
 
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
 
-def build_ticker_universe() -> list[str]:
-    sp500 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
-    nasdaq100 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/Nasdaq-100")
-    dax = extract_symbols_from_tables("https://en.wikipedia.org/wiki/DAX", suffix=".DE")
-    mdax = extract_symbols_from_tables("https://en.wikipedia.org/wiki/MDAX", suffix=".DE")
-    cac40 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/CAC_40", suffix=".PA")
+    .kpi-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+    }
 
-    combined = []
-    seen = set()
+    .kpi-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
 
-    for sym in CORE_UNIVERSE + sp500 + nasdaq100 + dax + mdax + cac40:
-        if sym and sym not in seen:
-            seen.add(sym)
-            combined.append(sym)
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 700;
+      margin-top: 4px;
+      color: var(--text-primary);
+    }
 
-    print(f"Gesamtpool vor Limit: {len(combined)} eindeutige Ticker")
-    return combined[:MAX_TICKERS]
+    .filter-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 24px;
+    }
 
+    @media (max-width: 900px) {
+      .filter-panel {
+        grid-template-columns: 1fr;
+      }
+    }
 
-def compute_rsi(series: pd.Series, period: int = 14) -> float:
-    delta = series.diff()
-    gain = delta.clip(lower=0).rolling(window=period).mean()
-    loss = (-delta.clip(upper=0)).rolling(window=period).mean()
-    rs = gain / loss.replace(0, np.nan)
-    rsi = 100 - (100 / (1 + rs))
-    val = rsi.iloc[-1]
-    return round(float(val), 1) if pd.notna(val) else 50.0
+    .filter-group {
+      margin-bottom: 14px;
+    }
 
+    .filter-group:last-child {
+      margin-bottom: 0;
+    }
 
-def _extract_single_history(df: pd.DataFrame, sym: str) -> pd.DataFrame | None:
-    if df is None or df.empty:
-        return None
+    .filter-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
 
-    if not isinstance(df.columns, pd.MultiIndex):
-        if "Close" not in df.columns:
-            return None
-        sub = pd.DataFrame({
-            "Close": df["Close"],
-            "Volume": df["Volume"] if "Volume" in df.columns else 0.0,
-        }).dropna(subset=["Close"])
-        return sub if len(sub) >= 60 else None
+    .pill-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
 
-    lvl0 = set(df.columns.get_level_values(0))
-    lvl1 = set(df.columns.get_level_values(1))
+    .pill {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 5px 12px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
 
-    if sym in lvl0:
-        block = df[sym]
-    elif "Close" in lvl0:
-        block = pd.DataFrame({
-            "Close": df["Close"][sym] if sym in df["Close"].columns else np.nan,
-            "Volume": df["Volume"][sym] if ("Volume" in lvl0 and sym in df["Volume"].columns) else 0.0,
-        })
-    elif "Close" in lvl1:
-        cols = {}
-        for field in ("Close", "Volume"):
-            matches = [c for c in df.columns if c[1] == field and (c[0] == sym or len(lvl0) == 1)]
-            if matches:
-                cols[field] = df[matches[0]]
-        if "Close" not in cols:
-            return None
-        block = pd.DataFrame(cols)
-    else:
-        return None
+    .pill:hover {
+      border-color: var(--accent-secondary);
+      color: var(--text-primary);
+    }
 
-    if "Close" not in block:
-        return None
+    .pill.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: #6ee7b7;
+      font-weight: 600;
+    }
 
-    close_s = block["Close"]
-    if isinstance(close_s, pd.DataFrame):
-        close_s = close_s.iloc[:, 0]
+    .pill span.count {
+      background: rgba(255, 255, 255, 0.08);
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
 
-    if "Volume" in block:
-        vol_s = block["Volume"]
-        if isinstance(vol_s, pd.DataFrame):
-            vol_s = vol_s.iloc[:, 0]
-    else:
-        vol_s = pd.Series(0.0, index=close_s.index)
+    .slider-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 14px;
+      margin-bottom: 10px;
+    }
 
-    sub = pd.DataFrame({"Close": close_s, "Volume": vol_s}).dropna(subset=["Close"])
-    return sub if len(sub) >= 60 else None
+    .slider-box:last-child {
+      margin-bottom: 0;
+    }
 
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
 
-def download_history_batches(tickers: list[str]) -> dict[str, pd.DataFrame]:
-    all_tickers = list(dict.fromkeys(["^GSPC"] + tickers))
-    history_map: dict[str, pd.DataFrame] = {}
+    .slider-val {
+      color: var(--accent);
+      font-weight: 600;
+    }
 
-    for i in range(0, len(all_tickers), BATCH_SIZE):
-        chunk = all_tickers[i:i + BATCH_SIZE]
-        print(f"Lade Kurs-Batch {i // BATCH_SIZE + 1}/{(len(all_tickers) - 1) // BATCH_SIZE + 1} ({len(chunk)} Ticker)...")
-        try:
-            df = yf.download(
-                chunk,
-                period="1y",
-                interval="1d",
-                group_by="ticker",
-                auto_adjust=True,
-                threads=True,
-                progress=False,
-            )
-            for sym in chunk:
-                sub = _extract_single_history(df, sym)
-                if sub is not None:
-                    history_map[sym] = sub
-        except Exception as e:
-            print(f"Batch-Fehler bei Block {i}: {e}")
-        time.sleep(0.5)
+    .range-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
 
-    return history_map
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
 
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
 
-def fetch_info_single(sym: str) -> tuple[str, dict]:
-    time.sleep(random.uniform(0.05, 0.2))
-    try:
-        info = yf.Ticker(sym).info or {}
-        return sym, info
-    except Exception:
-        return sym, {}
+    .toolbar-left {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
 
+    .search-input {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 10px 16px;
+      border-radius: 12px;
+      width: 320px;
+      max-width: 100%;
+      font-size: 14px;
+      outline: none;
+    }
 
-def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, core_set: set[str]) -> dict | None:
-    close = hist["Close"].dropna()
-    volume = hist["Volume"].dropna() if "Volume" in hist else pd.Series(dtype=float)
+    .search-input:focus {
+      border-color: var(--accent);
+    }
 
-    if len(close) < 65:
-        return None
+    .toggle-chip {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 9px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+    }
 
-    price = float(close.iloc[-1])
-    high_52w = float(close.max())
-    dist_52w = ((price - high_52w) / high_52w)
+    .toggle-chip.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: #6ee7b7;
+      font-weight: 600;
+    }
+
+    .btn-reset {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 9px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-reset:hover {
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+    }
+
+    .table-wrap {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+
+    th {
+      padding: 13px 13px;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    th:hover {
+      color: var(--text-primary);
+    }
+
+    td {
+      padding: 13px 13px;
+      border-bottom: 1px solid rgba(38, 51, 77, 0.5);
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+
+    tbody tr:hover {
+      background: var(--bg-hover);
+    }
+
+    .stock-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .stock-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .pos-val {
+      color: #34d399;
+      font-weight: 600;
+    }
+
+    .neg-val {
+      color: #f87171;
+      font-weight: 600;
+    }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-block;
+    }
+
+    .badge-buy {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-hold {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-sell {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .status-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .score-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .score-bar {
+      width: 50px;
+      height: 6px;
+      background: #1e293b;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .score-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-secondary), var(--accent));
+    }
+
+    .chance-dots {
+      display: flex;
+      gap: 3px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 14px;
+      border-radius: 3px;
+      background: #1e293b;
+    }
+
+    .dot.filled {
+      background: var(--accent);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 10, 20, 0.78);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 100;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      max-width: 720px;
+      width: 100%;
+      padding: 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+      gap: 12px;
+    }
+
+    .modal-close {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 600px) {
+      .metrics-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .metric-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 12px;
+    }
+
+    .metric-item span {
+      display: block;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .metric-item strong {
+      font-size: 15.5px;
+      color: var(--text-primary);
+    }
+
+    canvas {
+      width: 100%;
+      height: 170px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .guide-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+    }
+
+    .guide-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .guide-step h3 {
+      font-size: 14px;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-logo">AP</div>
+        <div>
+          <h1>AlphaPulse Market Scanner</h1>
+          <p>Automatisierte Trend-, Relative-Stärke- &amp; Fundamental-Analyse</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn-guide" id="openGuideBtn">? Anleitung</button>
+        <div class="sync-badge">
+          <span class="sync-dot"></span>
+          <span id="lastUpdated">Initialisiere...</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Gefilterte Werte</div>
+        <div class="kpi-value" id="kpiTotal">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Signal: Kaufen</div>
+        <div class="kpi-value" style="color: var(--buy);" id="kpiBuy">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Ø Tech-Score</div>
+        <div class="kpi-value" id="kpiTech">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Ø Funda-Score</div>
+        <div class="kpi-value" id="kpiFunda">0</div>
+      </div>
+    </section>
+
+    <section class="filter-panel">
+      <div>
+        <div class="filter-group">
+          <div class="filter-title">Handelssignal</div>
+          <div class="pill-wrap" id="ratingFilters"></div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-title">Strategie</div>
+          <div class="pill-wrap" id="strategyFilters"></div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-title">Chart-Phase / Status</div>
+          <div class="pill-wrap" id="statusFilters"></div>
+        </div>
+        <div class="filter-group">
+          <div class="filter-title">Fokus-Sektor / Watchlist-Tag</div>
+          <div class="pill-wrap" id="tagFilters"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="slider-box">
+          <div class="slider-header">
+            <span>Tech-Score (Trend &amp; Momentum)</span>
+            <span class="slider-val" id="techRangeLabel">0 – 100</span>
+          </div>
+          <div class="range-row">
+            <input type="range" id="techMin" min="0" max="100" value="0" />
+            <input type="range" id="techMax" min="0" max="100" value="100" />
+          </div>
+        </div>
+
+        <div class="slider-box">
+          <div class="slider-header">
+            <span>Funda-Score (Bilanz &amp; Wachstum)</span>
+            <span class="slider-val" id="fundaRangeLabel">0 – 100</span>
+          </div>
+          <div class="range-row">
+            <input type="range" id="fundaMin" min="0" max="100" value="0" />
+            <input type="range" id="fundaMax" min="0" max="100" value="100" />
+          </div>
+        </div>
+
+        <div class="slider-box">
+          <div class="slider-header">
+            <span>Mindest-Chance &amp; Max. Risiko</span>
+            <span class="slider-val" id="chanceRiskLabel">Chance ≥ 1 · Risiko ≤ 5</span>
+          </div>
+          <div class="range-row">
+            <input type="range" id="chanceMin" min="1" max="5" value="1" />
+            <input type="range" id="riskMax" min="1" max="5" value="5" />
+          </div>
+        </div>
+
+        <div class="slider-box">
+          <div class="slider-header">
+            <span>Mindest-Volumen (20T Ø Aktien/Tag)</span>
+            <span class="slider-val" id="volLabel">alle</span>
+          </div>
+          <input type="range" id="volMin" min="0" max="5000000" step="100000" value="0" />
+        </div>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <input type="text" id="searchInput" class="search-input" placeholder="Suche nach Name, Ticker, Strategie, Land..." />
+        <button class="toggle-chip" id="outperformToggle">Nur Outperformer (RS 3M &gt; 0)</button>
+      </div>
+      <button class="btn-reset" id="resetBtn">Filter zurücksetzen</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-sort="name">Unternehmen ↕</th>
+            <th data-sort="price">Kurs ↕</th>
+            <th data-sort="rating">Signal ↕</th>
+            <th data-sort="status">Phase ↕</th>
+            <th data-sort="chance">Chance ↕</th>
+            <th data-sort="tech_score">Tech ↕</th>
+            <th data-sort="funda_score">Funda ↕</th>
+            <th data-sort="mom3m">3M % ↕</th>
+            <th data-sort="rs3m">RS 3M ↕</th>
+            <th data-sort="distHighPct">52W Hoch ↕</th>
+            <th data-sort="rsi">RSI ↕</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h2 id="mTitle">Unternehmen</h2>
+          <p id="mSub" style="color: var(--text-secondary); font-size: 13px;"></p>
+        </div>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <canvas id="priceChart" width="660" height="170"></canvas>
+      <div class="metrics-grid" id="mMetrics"></div>
+    </div>
+  </div>
+
+  <!-- Tutorial / Anleitung Modal -->
+  <div class="modal-backdrop" id="guideBackdrop">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h2>Kurzanleitung: So nutzt du den Scanner</h2>
+          <p style="color: var(--text-secondary); font-size: 13px;">Schneller Workflow für die tägliche Vorauswahl</p>
+        </div>
+        <button class="modal-close" id="guideClose">✕</button>
+      </div>
+      <div class="guide-list">
+        <div class="guide-step">
+          <h3>1. Signal, Strategie &amp; Outperformer eingrenzen</h3>
+          <p>Starte mit <strong>kaufen</strong> oder <strong>Turnaround</strong> und aktiviere bei Bedarf <strong>Nur Outperformer (RS 3M &gt; 0)</strong>, um Werte zu finden, die den S&amp;P 500 über 3 Monate schlagen.</p>
+        </div>
+        <div class="guide-step">
+          <h3>2. Scores, 52W-Abstand &amp; Liquidität prüfen</h3>
+          <p><strong>52W Hoch</strong> zeigt den Abstand zum Jahreshoch (nahe 0 % = Ausbruchsnähe, stark negativ = Rebound-Kandidat). Mit dem <strong>Volumen-Regler</strong> filterst du dünn gehandelte Nebenwerte heraus.</p>
+        </div>
+        <div class="guide-step">
+          <h3>3. Sortieren &amp; Detailansicht öffnen</h3>
+          <p>Klicke auf eine Tabellenüberschrift zum Sortieren und auf eine Zeile, um Chart, SMA 50/200, RS 3M, Durchschnittsvolumen, Forward KGV und Umsatzwachstum im Detail zu sehen.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allStocks = [];
+    let selectedRatings = new Set();
+    let selectedStrategies = new Set();
+    let selectedStatuses = new Set();
+    let selectedTags = new Set();
+    let onlyOutperformers = false;
+    let sortKey = 'tech_score';
+    let sortAsc = false;
+
+    const RATINGS = ['kaufen', 'halten', 'verkaufen'];
+    const STRATEGIES = ['Wachstum', 'Turnaround', 'Cashflow', 'Dividende'];
+    const STATUSES = [
+      'Bodenbildung', 'Turnaround', 'Position verwalten',
+      'Boden abwarten', 'Dynamikverlust', 'Regression abwarten',
+      'Trendbruch', 'Underperformance'
+    ];
+
+    function getTechScore(s) {
+      const val = Number(s?.tech_score ?? s?.wlatar);
+      return Number.isFinite(val) ? Math.max(0, Math.min(100, val)) : 0;
+    }
+
+    function getFundaScore(s) {
+      const val = Number(s?.funda_score ?? s?.wlafar);
+      return Number.isFinite(val) ? Math.max(0, Math.min(100, val)) : 0;
+    }
+
+    function formatVol(v) {
+      if (!v || v <= 0) return '—';
+      if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + ' Mio.';
+      if (v >= 1_000) return Math.round(v / 1_000) + ' Tsd.';
+      return String(v);
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.style.display = 'block';
+      box.textContent = msg;
+    }
+
+    function normalizeStock(s) {
+      if (!s || typeof s !== 'object') return null;
+      const chance = Number(s.chance ?? 3);
+      const risk = Number(s.risk ?? 3);
+      const priceNum = Number(s.price);
+      const momNum = Number(s.mom3m);
+      const rsNum = Number(s.rs3m);
+      const distNum = Number(s.distHighPct);
+      const rsiNum = Number(s.rsi);
+      const volNum = Number(s.avgVolume ?? 0);
+      return {
+        name: String(s.name || s.ticker || 'Unbekannt'),
+        ticker: String(s.ticker || ''),
+        isin: String(s.isin || '—'),
+        strategy: String(s.strategy || 'Wachstum'),
+        tag: String(s.tag || ''),
+        chance: Number.isFinite(chance) ? Math.max(1, Math.min(5, chance)) : 3,
+        risk: Number.isFinite(risk) ? Math.max(1, Math.min(5, risk)) : 3,
+        rating: String(s.rating || 'halten'),
+        status: String(s.status || 'Underperformance'),
+        country: String(s.country || '—'),
+        sector: String(s.sector || '—'),
+        tech_score: getTechScore(s),
+        funda_score: getFundaScore(s),
+        price: s.price != null && Number.isFinite(priceNum) ? priceNum : null,
+        currency: String(s.currency || ''),
+        sma50: s.sma50 ?? '—',
+        sma200: s.sma200 ?? '—',
+        high52w: s.high52w ?? '—',
+        distHighPct: s.distHighPct != null && Number.isFinite(distNum) ? distNum : null,
+        rsi: s.rsi != null && Number.isFinite(rsiNum) ? rsiNum : null,
+        mom3m: s.mom3m != null && Number.isFinite(momNum) ? momNum : null,
+        rs3m: s.rs3m != null && Number.isFinite(rsNum) ? rsNum : null,
+        avgVolume: Number.isFinite(volNum) ? volNum : 0,
+        forwardPE: s.forwardPE ?? '—',
+        revGrowth: s.revGrowth ?? null,
+        history: Array.isArray(s.history) ? s.history.map(Number).filter(Number.isFinite) : []
+      };
+    }
+
+    async function loadData() {
+      const statusEl = document.getElementById('lastUpdated');
+      try {
+        const res = await fetch('./data.json?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) {
+          throw new Error('data.json nicht erreichbar (HTTP ' + res.status + ')');
+        }
+        const text = await res.text();
+        const json = JSON.parse(text);
+        const rawList = Array.isArray(json.stocks) ? json.stocks : (Array.isArray(json) ? json : []);
+        allStocks = rawList.map(normalizeStock).filter(Boolean);
+        const benchText = json.benchmark_mom3m != null ? ` · S&P 3M: ${json.benchmark_mom3m > 0 ? '+' : ''}${json.benchmark_mom3m}%` : '';
+        statusEl.textContent = 'Stand: ' + (json.updated_at || 'Aktuell') + ` · ${allStocks.length} Werte` + benchText;
+        if (!allStocks.length) {
+          showError('Die data.json wurde geladen, enthält aber aktuell keine Einträge.');
+        }
+      } catch (e) {
+        statusEl.textContent = 'Ladefehler';
+        showError('Konnte data.json nicht verarbeiten: ' + (e.message || e));
+        allStocks = [];
+      }
+
+      buildFilterPills();
+      render();
+    }
+
+    function bindPillClicks(selector, targetSet) {
+      document.querySelectorAll(selector).forEach(btn => {
+        btn.addEventListener('click', () => {
+          const val = btn.dataset.val;
+          if (targetSet.has(val)) {
+            targetSet.delete(val);
+            btn.classList.remove('active');
+          } else {
+            targetSet.add(val);
+            btn.classList.add('active');
+          }
+          render();
+        });
+      });
+    }
+
+    function buildFilterPills() {
+      document.getElementById('ratingFilters').innerHTML = RATINGS.map(r => {
+        const count = allStocks.filter(s => s.rating === r).length;
+        return `<button class="pill r-pill" data-val="${r}">${r} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      document.getElementById('strategyFilters').innerHTML = STRATEGIES.map(st => {
+        const count = allStocks.filter(s => s.strategy === st).length;
+        return `<button class="pill stg-pill" data-val="${st}">${st} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      document.getElementById('statusFilters').innerHTML = STATUSES.map(st => {
+        const count = allStocks.filter(s => s.status === st).length;
+        return `<button class="pill st-pill" data-val="${st}">${st} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      const tags = [...new Set(allStocks.map(s => s.tag).filter(Boolean))];
+      document.getElementById('tagFilters').innerHTML = tags.map(t => {
+        const count = allStocks.filter(s => s.tag === t).length;
+        return `<button class="pill tg-pill" data-val="${t}">${t} <span class="count">${count}</span></button>`;
+      }).join('');
+
+      bindPillClicks('.r-pill', selectedRatings);
+      bindPillClicks('.stg-pill', selectedStrategies);
+      bindPillClicks('.st-pill', selectedStatuses);
+      bindPillClicks('.tg-pill', selectedTags);
+    }
+
+    function render() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const tMin = Math.min(+document.getElementById('techMin').value, +document.getElementById('techMax').value);
+      const tMax = Math.max(+document.getElementById('techMin').value, +document.getElementById('techMax').value);
+      const fMin = Math.min(+document.getElementById('fundaMin').value, +document.getElementById('fundaMax').value);
+      const fMax = Math.max(+document.getElementById('fundaMin').value, +document.getElementById('fundaMax').value);
+      const cMin = +document.getElementById('chanceMin').value;
+      const rMax = +document.getElementById('riskMax').value;
+      const vMin = +document.getElementById('volMin').value;
+
+      document.getElementById('techRangeLabel').textContent = `${tMin} – ${tMax}`;
+      document.getElementById('fundaRangeLabel').textContent = `${fMin} – ${fMax}`;
+      document.getElementById('chanceRiskLabel').textContent = `Chance ≥ ${cMin} · Risiko ≤ ${rMax}`;
+      document.getElementById('volLabel').textContent = vMin > 0 ? `ab ${formatVol(vMin)}` : 'alle';
+
+      let filtered = allStocks.filter(s => {
+        const tech = getTechScore(s);
+        const funda = getFundaScore(s);
+        if (selectedRatings.size && !selectedRatings.has(s.rating)) return false;
+        if (selectedStrategies.size && !selectedStrategies.has(s.strategy)) return false;
+        if (selectedStatuses.size && !selectedStatuses.has(s.status)) return false;
+        if (selectedTags.size && !selectedTags.has(s.tag)) return false;
+        if (onlyOutperformers && (s.rs3m == null || s.rs3m <= 0)) return false;
+        if (tech < tMin || tech > tMax) return false;
+        if (funda < fMin || funda > fMax) return false;
+        if (s.chance < cMin) return false;
+        if (s.risk > rMax) return false;
+        if (vMin > 0 && s.avgVolume < vMin) return false;
+        if (q) {
+          const hay = `${s.name} ${s.ticker} ${s.isin} ${s.country} ${s.sector} ${s.strategy} ${s.tag}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      filtered.sort((a, b) => {
+        const v1 = sortKey === 'tech_score' ? getTechScore(a) : (sortKey === 'funda_score' ? getFundaScore(a) : (a[sortKey] ?? -999999));
+        const v2 = sortKey === 'tech_score' ? getTechScore(b) : (sortKey === 'funda_score' ? getFundaScore(b) : (b[sortKey] ?? -999999));
+        if (typeof v1 === 'number' && typeof v2 === 'number') {
+          return sortAsc ? v1 - v2 : v2 - v1;
+        }
+        return sortAsc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
+      });
+
+      document.getElementById('kpiTotal').textContent = filtered.length;
+      document.getElementById('kpiBuy').textContent = filtered.filter(s => s.rating === 'kaufen').length;
+      const avgTech = filtered.length ? Math.round(filtered.reduce((acc, item) => acc + getTechScore(item), 0) / filtered.length) : 0;
+      const avgFunda = filtered.length ? Math.round(filtered.reduce((acc, item) => acc + getFundaScore(item), 0) / filtered.length) : 0;
+      document.getElementById('kpiTech').textContent = avgTech;
+      document.getElementById('kpiFunda').textContent = avgFunda;
+
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = filtered.map((s, idx) => {
+        const tech = getTechScore(s);
+        const funda = getFundaScore(s);
+        const badgeCls = s.rating === 'kaufen' ? 'badge-buy' : (s.rating === 'verkaufen' ? 'badge-sell' : 'badge-hold');
+        const dots = [1, 2, 3, 4, 5].map(i => `<span class="dot ${i <= s.chance ? 'filled' : ''}"></span>`).join('');
+        const momCls = s.mom3m != null ? (s.mom3m >= 0 ? 'pos-val' : 'neg-val') : '';
+        const momText = s.mom3m != null ? `${s.mom3m > 0 ? '+' : ''}${s.mom3m}%` : '—';
+        const rsCls = s.rs3m != null ? (s.rs3m >= 0 ? 'pos-val' : 'neg-val') : '';
+        const rsText = s.rs3m != null ? `${s.rs3m > 0 ? '+' : ''}${s.rs3m}%` : '—';
+        const distText = s.distHighPct != null ? `${s.distHighPct}%` : '—';
+        return `
+          <tr data-idx="${idx}">
+            <td>
+              <div class="stock-name">${s.name}</div>
+              <div class="stock-sub">${s.ticker}${s.tag ? ' · ' + s.tag : ''}</div>
+            </td>
+            <td><strong>${s.price != null ? s.price : '—'}</strong> <span class="stock-sub">${s.currency}</span></td>
+            <td><span class="badge ${badgeCls}">${s.rating}</span></td>
+            <td><span class="status-chip">${s.status}</span></td>
+            <td><div class="chance-dots">${dots}</div></td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-fill" style="width:${tech}%"></div></div>
+                <strong>${tech}</strong>
+              </div>
+            </td>
+            <td>
+              <div class="score-bar-wrap">
+                <div class="score-bar"><div class="score-fill" style="width:${funda}%"></div></div>
+                <strong>${funda}</strong>
+              </div>
+            </td>
+            <td><span class="${momCls}">${momText}</span></td>
+            <td><span class="${rsCls}">${rsText}</span></td>
+            <td>${distText}</td>
+            <td>${s.rsi != null ? s.rsi : '—'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('tr').forEach(tr => {
+        tr.addEventListener('click', () => openModal(filtered[+tr.dataset.idx]));
+      });
+    }
+
+    function openModal(s) {
+      if (!s) return;
+      const tech = getTechScore(s);
+      const funda = getFundaScore(s);
+      document.getElementById('mTitle').textContent = `${s.name} (${s.ticker})`;
+      document.getElementById('mSub').textContent = `${s.strategy} · ${s.sector} · ${s.country} · ISIN: ${s.isin}`;
+      document.getElementById('mMetrics').innerHTML = `
+        <div class="metric-item"><span>Aktueller Kurs</span><strong>${s.price ?? '—'} ${s.currency}</strong></div>
+        <div class="metric-item"><span>Tech / Funda Score</span><strong>${tech} / ${funda}</strong></div>
+        <div class="metric-item"><span>Chance / Risiko</span><strong>${s.chance}/5 · Risiko ${s.risk}/5</strong></div>
+        <div class="metric-item"><span>3M-Mom. / RS vs. S&amp;P</span><strong>${s.mom3m != null ? s.mom3m + '%' : '—'} / ${s.rs3m != null ? (s.rs3m > 0 ? '+' : '') + s.rs3m + '%' : '—'}</strong></div>
+        <div class="metric-item"><span>52W Hoch / Abstand</span><strong>${s.high52w} (${s.distHighPct != null ? s.distHighPct + '%' : '—'})</strong></div>
+        <div class="metric-item"><span>SMA 50 / SMA 200</span><strong>${s.sma50} / ${s.sma200}</strong></div>
+        <div class="metric-item"><span>RSI (14)</span><strong>${s.rsi ?? '—'}</strong></div>
+        <div class="metric-item"><span>Ø Volumen (20 Tage)</span><strong>${formatVol(s.avgVolume)}</strong></div>
+        <div class="metric-item"><span>Forward KGV / Umsatz %</span><strong>${s.forwardPE} / ${s.revGrowth != null ? s.revGrowth + '%' : '—'}</strong></div>
+      `;
+      document.getElementById('modalBackdrop').classList.add('open');
+      drawChart(s.history || []);
+    }
+
+    function drawChart(pts) {
+      const canvas = document.getElementById('priceChart');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (pts.length < 2) return;
+
+      const min = Math.min(...pts);
+      const max = Math.max(...pts);
+      const pad = 20;
+      const w = canvas.width - pad * 2;
+      const h = canvas.height - pad * 2;
+
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      pts.forEach((v, i) => {
+        const x = pad + (i / (pts.length - 1)) * w;
+        const y = pad + h - ((v - min) / Math.max(0.001, max - min)) * h;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+
+    document.getElementById('modalClose').onclick = () => document.getElementById('modalBackdrop').classList.remove('open');
+    document.getElementById('modalBackdrop').onclick = (e) => {
+      if (e.target.id === 'modalBackdrop') document.getElementById('modalBackdrop').classList.remove('open');
+    };
+
+    document.getElementById('openGuideBtn').onclick = () => document.getElementById('guideBackdrop').classList.add('open');
+    document.getElementById('guideClose').onclick = () => document.getElementById('guideBackdrop').classList.remove('open');
+    document.getElementById('guideBackdrop').onclick = (e) => {
+      if (e.target.id === 'guideBackdrop') document.getElementById('guideBackdrop').classList.remove('open');
+    };
+
+    const outBtn = document.getElementById('outperformToggle');
+    outBtn.addEventListener('click', () => {
+      onlyOutperformers = !onlyOutperformers;
+      outBtn.classList.toggle('active', onlyOutperformers);
+      render();
+    });
+
+    ['searchInput', 'techMin', 'techMax', 'fundaMin', 'fundaMax', 'chanceMin', 'riskMax', 'volMin'].forEach(id => {
+      document.getElementById(id).addEventListener('input', render);
+    });
+
+    document.querySelectorAll('th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortKey === key) sortAsc = !sortAsc;
+        else { sortKey = key; sortAsc = false; }
+        render();
+      });
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      selectedRatings.clear();
+      selectedStrategies.clear();
+      selectedStatuses.clear();
+      selectedTags.clear();
+      onlyOutperformers = false;
+      outBtn.classList.remove('active');
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      document.getElementById('searchInput').value = '';
+      document.getElementById('techMin').value = 0;
+      document.getElementById('techMax').value = 100;
+      document.getElementById('fundaMin').value = 0;
+      document.getElementById('fundaMax').value = 100;
+      document.getElementById('chanceMin').value = 1;
+      document.getElementById('riskMax').value = 5;
+      document.getElementById('volMin').value = 0;
+      render();
+    });
+
+    loadData();
+  </script>
+</body>
+</html>

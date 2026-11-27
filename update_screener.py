@@ -11,9 +11,9 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-MAX_TICKERS = 800
-BATCH_SIZE = 100
-INFO_WORKERS = 8
+MAX_TICKERS = 1000
+BATCH_SIZE = 125
+INFO_WORKERS = 6
 
 CORE_UNIVERSE = [
     "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "DFLI", "BTU", "NVVE",
@@ -27,7 +27,7 @@ HEADERS = {
 
 
 def fetch_wiki_tables(url: str):
-    resp = requests.get(url, headers=HEADERS, timeout=20)
+    resp = requests.get(url, headers=HEADERS, timeout=25)
     resp.raise_for_status()
     return pd.read_html(StringIO(resp.text))
 
@@ -79,14 +79,16 @@ def extract_symbols_from_tables(url: str, suffix: str = "") -> list[str]:
 def build_ticker_universe() -> list[str]:
     sp500 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
     nasdaq100 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/Nasdaq-100")
+    russell1000 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/Russell_1000_Index")
     dax = extract_symbols_from_tables("https://en.wikipedia.org/wiki/DAX", suffix=".DE")
     mdax = extract_symbols_from_tables("https://en.wikipedia.org/wiki/MDAX", suffix=".DE")
+    sdax = extract_symbols_from_tables("https://en.wikipedia.org/wiki/SDAX", suffix=".DE")
     cac40 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/CAC_40", suffix=".PA")
 
     combined = []
     seen = set()
 
-    for sym in CORE_UNIVERSE + sp500 + nasdaq100 + dax + mdax + cac40:
+    for sym in CORE_UNIVERSE + sp500 + nasdaq100 + russell1000 + dax + mdax + sdax + cac40:
         if sym and sym not in seen:
             seen.add(sym)
             combined.append(sym)
@@ -181,13 +183,13 @@ def download_history_batches(tickers: list[str]) -> dict[str, pd.DataFrame]:
                     history_map[sym] = sub
         except Exception as e:
             print(f"Batch-Fehler bei Block {i}: {e}")
-        time.sleep(0.5)
+        time.sleep(0.9)
 
     return history_map
 
 
 def fetch_info_single(sym: str) -> tuple[str, dict]:
-    time.sleep(random.uniform(0.05, 0.2))
+    time.sleep(random.uniform(0.08, 0.25))
     try:
         info = yf.Ticker(sym).info or {}
         return sym, info

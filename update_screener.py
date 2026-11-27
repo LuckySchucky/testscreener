@@ -1,7 +1,7 @@
 import json
 import math
-import time
 import random
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from io import StringIO
@@ -15,7 +15,6 @@ MAX_TICKERS = 500
 BATCH_SIZE = 100
 INFO_WORKERS = 8
 
-# Deine priorisierte CORE_UNIVERSE (immer zuerst drin)
 CORE_UNIVERSE = [
     "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "DFLI", "BTU", "NVVE",
     "DELL", "INTC", "AAPL", "VRT", "CLS", "CRWD", "LLY", "NVDA", "MU",
@@ -44,7 +43,6 @@ def extract_symbols_from_tables(url: str, suffix: str = "") -> list[str]:
     candidate_cols = ["Symbol", "Ticker", "Ticker symbol", "WKN / Symbol", "Epic"]
 
     for df in tables:
-        # MultiIndex-Spalten flachklopfen falls vorhanden
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = [" ".join([str(c) for c in col]).strip() for col in df.columns]
 
@@ -67,12 +65,10 @@ def extract_symbols_from_tables(url: str, suffix: str = "") -> list[str]:
                 elif suffix == ".PA":
                     sym = sym.replace(".PA", "") + ".PA"
                 else:
-                    # US-Ticker: BRK.B -> BRK-B für yfinance
                     if "." in sym and not sym.endswith((".DE", ".PA", ".KS", ".L", ".SW")):
                         sym = sym.replace(".", "-")
                 cleaned.append(sym)
 
-            # Größte gefundene Komponententabelle merken (nicht frühzeitig abbrechen!)
             if len(cleaned) > len(best_symbols):
                 best_symbols = cleaned
 
@@ -90,7 +86,6 @@ def build_ticker_universe() -> list[str]:
     combined = []
     seen = set()
 
-    # Core-Werte zuerst, danach breite Indizes mischen
     for sym in CORE_UNIVERSE + sp500 + nasdaq100 + dax + mdax + cac40:
         if sym and sym not in seen:
             seen.add(sym)
@@ -110,9 +105,62 @@ def compute_rsi(series: pd.Series, period: int = 14) -> float:
     return round(float(val), 1) if pd.notna(val) else 50.0
 
 
+def _extract_single_history(df: pd.DataFrame, sym: str) -> pd.DataFrame | None:
+    if df is None or df.empty:
+        return None
+
+    if not isinstance(df.columns, pd.MultiIndex):
+        if "Close" not in df.columns:
+            return None
+        sub = pd.DataFrame({
+            "Close": df["Close"],
+            "Volume": df["Volume"] if "Volume" in df.columns else 0.0,
+        }).dropna(subset=["Close"])
+        return sub if len(sub) >= 60 else None
+
+    lvl0 = set(df.columns.get_level_values(0))
+    lvl1 = set(df.columns.get_level_values(1))
+
+    if sym in lvl0:
+        block = df[sym]
+    elif "Close" in lvl0:
+        block = pd.DataFrame({
+            "Close": df["Close"][sym] if sym in df["Close"].columns else np.nan,
+            "Volume": df["Volume"][sym] if ("Volume" in lvl0 and sym in df["Volume"].columns) else 0.0,
+        })
+    elif "Close" in lvl1:
+        cols = {}
+        for field in ("Close", "Volume"):
+            matches = [c for c in df.columns if c[1] == field and (c[0] == sym or len(lvl0) == 1)]
+            if matches:
+                cols[field] = df[matches[0]]
+        if "Close" not in cols:
+            return None
+        block = pd.DataFrame(cols)
+    else:
+        return None
+
+    if "Close" not in block:
+        return None
+
+    close_s = block["Close"]
+    if isinstance(close_s, pd.DataFrame):
+        close_s = close_s.iloc[:, 0]
+
+    if "Volume" in block:
+        vol_s = block["Volume"]
+        if isinstance(vol_s, pd.DataFrame):
+            vol_s = vol_s.iloc[:, 0]
+    else:
+        vol_s = pd.Series(0.0, index=close_s.index)
+
+    sub = pd.DataFrame({"Close": close_s, "Volume": vol_s}).dropna(subset=["Close"])
+    return sub if len(sub) >= 60 else None
+
+
 def download_history_batches(tickers: list[str]) -> dict[str, pd.DataFrame]:
     all_tickers = list(dict.fromkeys(["^GSPC"] + tickers))
-    history_map = {}
+    history_map: dict[str, pd.DataFrame] = {}
 
     for i in range(0, len(all_tickers), BATCH_SIZE):
         chunk = all_tickers[i:i + BATCH_SIZE]
@@ -127,20 +175,10 @@ def download_history_batches(tickers: list[str]) -> dict[str, pd.DataFrame]:
                 threads=True,
                 progress=False,
             )
-            if df.empty:
-                continue
-
-            if len(chunk) == 1:
-                sym = chunk[0]
-                sub = df.dropna(subset=["Close"])
-                if len(sub) >= 60:
+            for sym in chunk:
+                sub = _extract_single_history(df, sym)
+                if sub is not None:
                     history_map[sym] = sub
-            else:
-                for sym in chunk:
-                    if sym in df.columns.get_level_values(0):
-                        sub = df[sym].dropna(subset=["Close"])
-                        if len(sub) >= 60:
-                            history_map[sym] = sub
         except Exception as e:
             print(f"Batch-Fehler bei Block {i}: {e}")
         time.sleep(0.5)
@@ -162,189 +200,3 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
     volume = hist["Volume"].dropna() if "Volume" in hist else pd.Series(dtype=float)
 
     if len(close) < 65:
-        return None
-
-    price = float(close.iloc[-1])
-    high_52w = float(close.max())
-    dist_52w = ((price - high_52w) / high_52w) * 100.0 if high_52w > 0 else 0.0
-
-    price_3m_ago = float(close.iloc[-63]) if len(close) >= 63 else float(close.iloc[0])
-    ret_3m = ((price - price_3m_ago) / price_3m_ago) * 100.0 if price_3m_ago > 0 else 0.0
-    rs_3m = ret_3m - sp500_3m_ret
-
-    sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else price
-    sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else sma50
-    rsi = compute_rsi(close, 14)
-
-    avg_vol_20 = float(volume.tail(20).mean()) if len(volume) >= 20 else 0.0
-    dollar_vol = avg_vol_20 * price
-
-    # Tech-Score (0-100)
-    tech_score = 0
-    if price > sma50:
-        tech_score += 25
-    if price > sma200:
-        tech_score += 25
-    if sma50 > sma200:
-        tech_score += 10
-    if rs_3m > 0:
-        tech_score += min(20, int(rs_3m * 1.2))
-    if 45 <= rsi <= 68:
-        tech_score += 10
-    elif 30 <= rsi < 45:
-        tech_score += 5
-    if dist_52w >= -15:
-        tech_score += 10
-    tech_score = max(0, min(100, tech_score))
-
-    # Funda-Score (0-100)
-    funda_score = 40  # Solider Basiswert, falls yfinance einzelne Felder nicht liefert
-    rev_growth = info.get("revenueGrowth")
-    roe = info.get("returnOnEquity")
-    profit_margin = info.get("profitMargins")
-    fwd_pe = info.get("forwardPE")
-    debt_eq = info.get("debtToEquity")
-
-    if isinstance(rev_growth, (int, float)):
-        if rev_growth > 0.20:
-            funda_score += 20
-        elif rev_growth > 0.08:
-            funda_score += 12
-        elif rev_growth > 0:
-            funda_score += 5
-        else:
-            funda_score -= 10
-
-    if isinstance(roe, (int, float)):
-        if roe > 0.18:
-            funda_score += 15
-        elif roe > 0.08:
-            funda_score += 8
-        elif roe < 0:
-            funda_score -= 10
-
-    if isinstance(profit_margin, (int, float)):
-        if profit_margin > 0.15:
-            funda_score += 15
-        elif profit_margin > 0.05:
-            funda_score += 8
-        elif profit_margin < 0:
-            funda_score -= 8
-
-    if isinstance(fwd_pe, (int, float)) and 0 < fwd_pe < 25:
-        funda_score += 10
-
-    if isinstance(debt_eq, (int, float)) and debt_eq > 200:
-        funda_score -= 10
-
-    funda_score = max(0, min(100, funda_score))
-
-    total_score = round(tech_score * 0.6 + funda_score * 0.4, 1)
-
-    # Phase bestimmen
-    if price > sma50 and price > sma200 and rs_3m > 0:
-        phase = "Aufwärtstrend"
-    elif price > sma50 and price <= sma200:
-        phase = "Turnaround"
-    elif price <= sma50 and price > sma200:
-        phase = "Rücksetzer"
-    else:
-        phase = "Boden abwarten"
-
-    # Signal bestimmen
-    if total_score >= 62 and price > sma50:
-        signal = "kaufen"
-    elif total_score >= 45:
-        signal = "halten"
-    else:
-        signal = "meiden"
-
-    chance = max(1, min(5, math.ceil(total_score / 20)))
-
-    # Risiko (1-5)
-    daily_vol = float(close.pct_change().dropna().std() * np.sqrt(252) * 100)
-    if daily_vol < 25:
-        risk = 2
-    elif daily_vol < 40:
-        risk = 3
-    elif daily_vol < 60:
-        risk = 4
-    else:
-        risk = 5
-
-    name = info.get("shortName") or info.get("longName") or sym
-    currency = info.get("currency") or ("EUR" if sym.endswith((".DE", ".PA")) else "USD")
-    sector = info.get("sector") or "Sonstige"
-
-    return {
-        "ticker": sym,
-        "name": name,
-        "is_core": sym in core_set,
-        "sector": sector,
-        "currency": currency,
-        "price": round(price, 2),
-        "signal": signal,
-        "phase": phase,
-        "chance": chance,
-        "risk": risk,
-        "tech_score": tech_score,
-        "funda_score": funda_score,
-        "total_score": total_score,
-        "ret_3m": round(ret_3m, 1),
-        "rs_3m": round(rs_3m, 1),
-        "dist_52w": round(dist_52w, 1),
-        "rsi": rsi,
-        "avg_volume": int(avg_vol_20),
-        "dollar_volume": int(dollar_vol),
-        "above_sma50": bool(price > sma50),
-        "above_sma200": bool(price > sma200),
-    }
-
-
-def main():
-    tickers = build_ticker_universe()
-    core_set = set(CORE_UNIVERSE)
-
-    history_map = download_history_batches(tickers)
-    print(f"Gültige Kursreihen geladen: {len(history_map)}")
-
-    sp500_hist = history_map.get("^GSPC")
-    if sp500_hist is not None and len(sp500_hist["Close"]) >= 63:
-        sp_c = sp500_hist["Close"].dropna()
-        sp500_3m_ret = ((float(sp_c.iloc[-1]) - float(sp_c.iloc[-63])) / float(sp_c.iloc[-63])) * 100.0
-    else:
-        sp500_3m_ret = 0.0
-
-    valid_symbols = [s for s in tickers if s in history_map]
-
-    info_map = {}
-    with ThreadPoolExecutor(max_workers=INFO_WORKERS) as executor:
-        futures = {executor.submit(fetch_info_single, sym): sym for sym in valid_symbols}
-        for idx, future in enumerate(as_completed(futures), 1):
-            sym, info = future.result()
-            info_map[sym] = info
-            if idx % 100 == 0:
-                print(f"Fundamentaldaten geladen: {idx}/{len(valid_symbols)}")
-
-    results = []
-    for sym in valid_symbols:
-        item = score_stock(sym, history_map[sym], info_map.get(sym, {}), sp500_3m_ret, core_set)
-        if item is not None:
-            results.append(item)
-
-    results.sort(key=lambda x: (x["is_core"], x["total_score"]), reverse=True)
-
-    payload = {
-        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "count": len(results),
-        "stocks": results,
-    }
-
-    with open("data.json", "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
-
-    print(f"Fertig! {len(results)} Aktien in data.json gespeichert.")
-
-
-if __name__ == "__main__":
-    main()

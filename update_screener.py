@@ -1,472 +1,350 @@
 import json
 import math
-import os
 import time
-import urllib.request
+import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from io import StringIO
+
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
 
 MAX_TICKERS = 500
+BATCH_SIZE = 100
+INFO_WORKERS = 8
 
-INCLUDE_DAX = True
-INCLUDE_MDAX = True
-INCLUDE_SP500 = True
-INCLUDE_NASDAQ100 = True
-
-TECH_WEIGHT = 0.60
-FUNDA_WEIGHT = 0.40
-
+# Deine priorisierte CORE_UNIVERSE (immer zuerst drin)
 CORE_UNIVERSE = [
-    {"ticker": "SMSN.IL", "name": "Samsung Electronics (GDR)", "isin": "US7960508882", "strategy": "Cashflow", "tag": "Fokus-Liste"},
-    {"ticker": "CLS", "name": "Celestica Inc.", "isin": "CA15101Q2071", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "CRDO", "name": "Credo Technology Group Holding Ltd", "isin": "KYG254571055", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "CIEN", "name": "Ciena Corp", "isin": "US1717793095", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "TER", "name": "Teradyne Inc.", "isin": "US8807701029", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "ENR.DE", "name": "Siemens Energy AG", "isin": "DE000ENER6Y0", "strategy": "Turnaround", "tag": "Fokus-Liste"},
-    {"ticker": "COHR", "name": "Coherent Corp.", "isin": "US19247G1076", "strategy": "Turnaround", "tag": "Fokus-Liste"},
-    {"ticker": "VIAV", "name": "Viavi Solutions Inc.", "isin": "US9255501051", "strategy": "Turnaround", "tag": "Fokus-Liste"},
-    {"ticker": "MU", "name": "Micron Technology Inc.", "isin": "US5951121038", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "VRT", "name": "Vertiv Holdings Co.", "isin": "US92537N1081", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "AEHR", "name": "Aehr Test Systems", "isin": "US00760J1088", "strategy": "Turnaround", "tag": "Fokus-Liste"},
-    {"ticker": "GE", "name": "GE Aerospace", "isin": "US3696043013", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "LLY", "name": "Eli Lilly and Company", "isin": "US5324571083", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "AXON", "name": "Axon Enterprise Inc.", "isin": "US05464C1018", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "CRWD", "name": "Crowdstrike Holdings Inc", "isin": "US22788C1053", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "META", "name": "Meta Platforms Inc", "isin": "US30303M1027", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "GEV", "name": "GE Vernova", "isin": "US36828A1016", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "PLTR", "name": "Palantir Technologies Inc.", "isin": "US69608A1088", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "AMZN", "name": "Amazon", "isin": "US0231351067", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "GOOG", "name": "Alphabet Inc. (Class C)", "isin": "US02079K1079", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "ASML", "name": "ASML", "isin": "NL0010273215", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "NVDA", "name": "NVIDIA Corp.", "isin": "US67066G1040", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "AVGO", "name": "Broadcom Inc.", "isin": "US11135F1012", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "TSM", "name": "Taiwan Semiconductor Manufacturing (ADR)", "isin": "US8740391003", "strategy": "Wachstum", "tag": "Fokus-Liste"},
-    {"ticker": "ORCL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
-    {"ticker": "IREN", "strategy": "Turnaround", "tag": "AI Data Center"},
-    {"ticker": "CIFR", "strategy": "Turnaround", "tag": "AI Data Center"},
-    {"ticker": "DELL", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
-    {"ticker": "HPE", "strategy": "Cashflow", "tag": "AI Data Center"},
-    {"ticker": "SMCI", "strategy": "Turnaround", "tag": "AI Data Center"},
-    {"ticker": "MSFT", "strategy": "Wachstum", "tag": "AI & Cloud 2030"},
-    {"ticker": "AAPL", "strategy": "Cashflow", "tag": "Big Tech"},
-    {"ticker": "VLN", "strategy": "Turnaround", "tag": "Semiconductors"},
-    {"ticker": "INTC", "strategy": "Turnaround", "tag": "Semiconductors"},
-    {"ticker": "AMD", "strategy": "Wachstum", "tag": "Semiconductors"},
-    {"ticker": "ARM", "strategy": "Wachstum", "tag": "Semiconductors"},
-    {"ticker": "EOSE", "strategy": "Turnaround", "tag": "Energy & Grid"},
-    {"ticker": "RUN", "strategy": "Turnaround", "tag": "Energy & Grid"},
-    {"ticker": "FLNC", "strategy": "Wachstum", "tag": "Energy & Grid"},
-    {"ticker": "DFLI", "strategy": "Turnaround", "tag": "Energy & Grid"},
-    {"ticker": "NVVE", "strategy": "Turnaround", "tag": "Energy & Grid"},
-    {"ticker": "BTU", "strategy": "Cashflow", "tag": "Energy & Grid"},
-    {"ticker": "VST", "strategy": "Wachstum", "tag": "Energy & Grid"},
-    {"ticker": "CEG", "strategy": "Wachstum", "tag": "Energy & Grid"},
-    {"ticker": "ZENA", "strategy": "Wachstum", "tag": "Tech & Robotics"},
-    {"ticker": "HIMS", "strategy": "Wachstum", "tag": "Healthcare"},
-    {"ticker": "NVO", "strategy": "Wachstum", "tag": "Healthcare"},
-    {"ticker": "RHM.DE", "strategy": "Wachstum", "tag": "Europa & Industrie"},
-    {"ticker": "SIE.DE", "strategy": "Dividende", "tag": "Europa & Industrie"},
-    {"ticker": "BAS.DE", "strategy": "Dividende", "tag": "Turnaround Watch"},
-    {"ticker": "BAYN.DE", "strategy": "Turnaround", "tag": "Turnaround Watch"},
-    {"ticker": "PYPL", "strategy": "Turnaround", "tag": "Turnaround Watch"},
-    {"ticker": "NKE", "strategy": "Turnaround", "tag": "Turnaround Watch"},
-    {"ticker": "BABA", "strategy": "Turnaround", "tag": "Asien & China Tech"},
-    {"ticker": "JD", "strategy": "Turnaround", "tag": "Asien & China Tech"},
-    {"ticker": "BIDU", "strategy": "Turnaround", "tag": "Asien & China Tech"},
-    {"ticker": "005930.KS", "strategy": "Cashflow", "tag": "Asien & China Tech"},
-    {"ticker": "000660.KS", "strategy": "Wachstum", "tag": "Asien & China Tech"},
+    "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "DFLI", "BTU", "NVVE",
+    "DELL", "INTC", "AAPL", "VRT", "CLS", "CRWD", "LLY", "NVDA", "MU",
+    "COHR", "AMBA", "ENR.DE", "SU.PA", "005930.KS", "000660.KS"
 ]
 
-EXTRA_UNIVERSE = [
-    "GOOGL", "AMZN", "META", "TSLA", "AVGO", "QCOM", "TXN", "MRVL", "ANET", "NOW",
-    "CRM", "PLTR", "SNOW", "MDB", "DDOG", "NET", "CRWD", "PANW", "UBER", "ABNB",
-    "SHOP", "COIN", "MSTR", "MARA", "RIOT", "CLSK", "IONQ", "RGTI", "JOBY", "ACHR",
-    "ENPH", "FSLR", "SEDG", "NEE", "DUK", "SO", "AEP", "ETR", "TLN", "OKLO",
-    "ALB", "SQM", "MP", "FCX", "NEM", "GOLD", "VALE", "RIO", "BHP", "XOM",
-    "CVX", "OXY", "SLB", "HAL", "COP", "EQT", "AR", "KMI", "WMB", "MPLX",
-    "JPM", "BAC", "GS", "MS", "V", "MA", "AXP", "BLK", "SCHW", "SOFI",
-    "UNH", "JNJ", "ABBV", "MRK", "PFE", "AMGN", "GILD", "ISRG", "TMO", "MDT",
-    "COST", "WMT", "HD", "LOW", "MCD", "SBUX", "DIS", "NFLX", "SPOT", "BKNG",
-    "SAP.DE", "ALV.DE", "DTE.DE", "MBG.DE", "BMW.DE", "VOW3.DE", "MUV2.DE", "IFX.DE",
-    "ADS.DE", "DHL.DE", "DBK.DE", "CBK.DE", "HEN3.DE", "BEI.DE", "FRE.DE", "SHL.DE",
-    "ENR.DE", "EOAN.DE", "RWE.DE", "AIR.PA", "MC.PA", "OR.PA", "TTE.PA", "SAN.PA",
-    "NOVO-B.CO", "AZN", "SHEL", "HSBC", "UL", "SONY", "TM", "TSM", "SE", "GRAB",
-]
-
-COUNTRY_MAP = {
-    "United States": "USA",
-    "Germany": "Deutschland",
-    "Netherlands": "Niederlande",
-    "United Kingdom": "Großbritannien",
-    "Denmark": "Dänemark",
-    "Israel": "Israel",
-    "Australia": "Australien",
-    "China": "China",
-    "Hong Kong": "Hongkong",
-    "South Korea": "Südkorea",
-    "Canada": "Kanada",
-    "France": "Frankreich",
-    "Switzerland": "Schweiz",
-    "Japan": "Japan",
-    "Taiwan": "Taiwan",
-}
-
-SECTOR_MAP = {
-    "Technology": "Informationstechnologie",
-    "Healthcare": "Gesundheitswesen",
-    "Industrials": "Industrie",
-    "Consumer Cyclical": "Nicht-Basiskonsumgüter",
-    "Consumer Defensive": "Basiskonsumgüter",
-    "Financial Services": "Finanzen",
-    "Energy": "Energie",
-    "Utilities": "Versorger",
-    "Basic Materials": "Grundstoffe",
-    "Communication Services": "Kommunikation",
-    "Real Estate": "Immobilien",
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
 
-def read_wiki_tables(url: str):
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (X11; Linux x86_64) "
-                "AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
-            )
-        },
-    )
-    with urllib.request.urlopen(req, timeout=20) as resp:
-        html = resp.read().decode("utf-8", errors="ignore")
-    return pd.read_html(html)
+def fetch_wiki_tables(url: str):
+    resp = requests.get(url, headers=HEADERS, timeout=20)
+    resp.raise_for_status()
+    return pd.read_html(StringIO(resp.text))
 
 
-def extract_symbols_from_tables(tables, suffix="", default_strategy="Wachstum", default_tag="Index"):
-    found = []
-    for df in tables:
-        cols = [str(c) for c in df.columns]
-        target_col = None
-        for c in cols:
-            low = c.lower()
-            if any(k in low for k in ("symbol", "ticker", "code")):
-                target_col = c
-                break
-        if target_col is None:
-            continue
-        for raw in df[target_col].dropna().astype(str):
-            sym = raw.strip().split()[0].replace(".", "-")
-            if not sym or len(sym) > 14:
-                continue
-            if suffix and not sym.upper().endswith(suffix.upper()):
-                sym = f"{sym}{suffix}"
-            found.append({"ticker": sym, "strategy": default_strategy, "tag": default_tag})
-        if found:
-            break
-    return found
-
-
-def load_tickers_txt(path="tickers.txt"):
-    if not os.path.exists(path):
-        return []
-    items = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            sym = line.strip()
-            if not sym or sym.startswith("#"):
-                continue
-            items.append({"ticker": sym, "strategy": "Wachstum", "tag": "Eigene Liste"})
-    return items
-
-
-def build_universe():
-    universe = list(CORE_UNIVERSE)
-    seen = {x["ticker"].upper() for x in universe}
-
-    def add_items(items):
-        added = 0
-        for item in items:
-            key = item["ticker"].upper()
-            if key not in seen:
-                seen.add(key)
-                universe.append(item)
-                added += 1
-        return added
-
-    txt_items = load_tickers_txt()
-    if txt_items:
-        print(f"Aus tickers.txt geladen: {add_items(txt_items)} neue Ticker")
-
-    wiki_sources = []
-    if INCLUDE_DAX:
-        wiki_sources.append(("DAX", "https://en.wikipedia.org/wiki/DAX", ".DE", "Cashflow", "DAX"))
-    if INCLUDE_MDAX:
-        wiki_sources.append(("MDAX", "https://en.wikipedia.org/wiki/MDAX", ".DE", "Wachstum", "MDAX"))
-    if INCLUDE_SP500:
-        wiki_sources.append(("S&P 500", "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "", "Wachstum", "S&P 500"))
-    if INCLUDE_NASDAQ100:
-        wiki_sources.append(("Nasdaq 100", "https://en.wikipedia.org/wiki/Nasdaq-100", "", "Wachstum", "Nasdaq 100"))
-
-    for label, url, suffix, strat, tag in wiki_sources:
-        try:
-            tables = read_wiki_tables(url)
-            extracted = extract_symbols_from_tables(tables, suffix=suffix, default_strategy=strat, default_tag=tag)
-            print(f"{label}: {add_items(extracted)} neue Ticker hinzugefügt")
-        except Exception as e:
-            print(f"{label} konnte nicht geladen werden: {e}")
-
-    fallback_items = [{"ticker": s, "strategy": "Wachstum", "tag": "Fokus-Pool"} for s in EXTRA_UNIVERSE]
-    print(f"Fokus-Pool: {add_items(fallback_items)} zusätzliche Ticker hinzugefügt")
-
-    print(f"Gesamt-Universum vor Limit: {len(universe)} (Limit: {MAX_TICKERS})")
-    return universe[:MAX_TICKERS]
-
-
-def get_benchmark_mom3m(symbol="^GSPC"):
+def extract_symbols_from_tables(url: str, suffix: str = "") -> list[str]:
     try:
-        hist = yf.Ticker(symbol).history(period="6mo", interval="1d")
-        close = hist["Close"].dropna()
-        if len(close) >= 63:
-            return round((float(close.iloc[-1]) / float(close.iloc[-63]) - 1) * 100, 1)
+        tables = fetch_wiki_tables(url)
     except Exception as e:
-        print(f"Benchmark {symbol} nicht abrufbar: {e}")
-    return 0.0
+        print(f"Fehler beim Laden von {url}: {e}")
+        return []
+
+    best_symbols = []
+    candidate_cols = ["Symbol", "Ticker", "Ticker symbol", "WKN / Symbol", "Epic"]
+
+    for df in tables:
+        # MultiIndex-Spalten flachklopfen falls vorhanden
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [" ".join([str(c) for c in col]).strip() for col in df.columns]
+
+        matched_col = None
+        for col in df.columns:
+            col_str = str(col).strip()
+            if any(c.lower() == col_str.lower() or c.lower() in col_str.lower() for c in candidate_cols):
+                matched_col = col
+                break
+
+        if matched_col is not None and len(df) >= 15:
+            raw_vals = df[matched_col].dropna().astype(str).tolist()
+            cleaned = []
+            for sym in raw_vals:
+                sym = sym.split("[")[0].strip().upper()
+                if not sym or sym in ("NAN", "NONE", "-"):
+                    continue
+                if suffix == ".DE":
+                    sym = sym.replace(".DE", "") + ".DE"
+                elif suffix == ".PA":
+                    sym = sym.replace(".PA", "") + ".PA"
+                else:
+                    # US-Ticker: BRK.B -> BRK-B für yfinance
+                    if "." in sym and not sym.endswith((".DE", ".PA", ".KS", ".L", ".SW")):
+                        sym = sym.replace(".", "-")
+                cleaned.append(sym)
+
+            # Größte gefundene Komponententabelle merken (nicht frühzeitig abbrechen!)
+            if len(cleaned) > len(best_symbols):
+                best_symbols = cleaned
+
+    print(f"{url} -> {len(best_symbols)} Ticker extrahiert")
+    return best_symbols
 
 
-def clamp(val, low=0, high=100):
-    return int(round(max(low, min(high, val))))
+def build_ticker_universe() -> list[str]:
+    sp500 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies")
+    nasdaq100 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/Nasdaq-100")
+    dax = extract_symbols_from_tables("https://en.wikipedia.org/wiki/DAX", suffix=".DE")
+    mdax = extract_symbols_from_tables("https://en.wikipedia.org/wiki/MDAX", suffix=".DE")
+    cac40 = extract_symbols_from_tables("https://en.wikipedia.org/wiki/CAC_40", suffix=".PA")
+
+    combined = []
+    seen = set()
+
+    # Core-Werte zuerst, danach breite Indizes mischen
+    for sym in CORE_UNIVERSE + sp500 + nasdaq100 + dax + mdax + cac40:
+        if sym and sym not in seen:
+            seen.add(sym)
+            combined.append(sym)
+
+    print(f"Gesamtpool vor Limit: {len(combined)} eindeutige Ticker")
+    return combined[:MAX_TICKERS]
 
 
-def calc_rsi(series, period=14):
+def compute_rsi(series: pd.Series, period: int = 14) -> float:
     delta = series.diff()
     gain = delta.clip(lower=0).rolling(window=period).mean()
     loss = (-delta.clip(upper=0)).rolling(window=period).mean()
     rs = gain / loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
-    return float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else 50.0
+    val = rsi.iloc[-1]
+    return round(float(val), 1) if pd.notna(val) else 50.0
 
 
-def calc_tech_score(hist: pd.DataFrame, bench_mom3m: float):
-    close = hist["Close"].dropna()
-    volume = hist["Volume"].dropna() if "Volume" in hist.columns else pd.Series(dtype=float)
+def download_history_batches(tickers: list[str]) -> dict[str, pd.DataFrame]:
+    all_tickers = list(dict.fromkeys(["^GSPC"] + tickers))
+    history_map = {}
 
-    price = float(close.iloc[-1])
-    sma50 = float(close.rolling(50).mean().iloc[-1])
-    sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else sma50
-    high_52w = float(close.tail(252).max())
-    low_52w = float(close.tail(252).min())
-    rsi = calc_rsi(close)
-    mom_3m = (price / float(close.iloc[-63]) - 1) * 100 if len(close) >= 63 else 0.0
-    rs_3m = mom_3m - bench_mom3m
-    dist_high_pct = ((price / high_52w) - 1) * 100 if high_52w > 0 else 0.0
-    avg_vol_20d = int(round(float(volume.tail(20).mean()))) if len(volume) >= 5 else 0
-
-    trend_score = 0
-    if price > sma200:
-        trend_score += 20
-    if price > sma50:
-        trend_score += 10
-    if sma50 > sma200:
-        trend_score += 5
-
-    if 42 <= rsi <= 65:
-        rsi_score = 25
-    elif 30 <= rsi < 42:
-        rsi_score = 20
-    elif rsi < 30:
-        rsi_score = 15
-    elif 65 < rsi <= 75:
-        rsi_score = 14
-    else:
-        rsi_score = 6
-
-    dist_high_ratio = (price / high_52w) if high_52w > 0 else 0.5
-    high_score = dist_high_ratio * 20
-    mom_score = max(0, min(20, 10 + mom_3m * 0.4 + rs_3m * 0.15))
-
-    score = clamp(trend_score + rsi_score + high_score + mom_score)
-    metrics = {
-        "price": round(price, 2),
-        "sma50": round(sma50, 2),
-        "sma200": round(sma200, 2),
-        "high52w": round(high_52w, 2),
-        "low52w": round(low_52w, 2),
-        "distHighPct": round(dist_high_pct, 1),
-        "rsi": round(rsi, 1),
-        "mom3m": round(mom_3m, 1),
-        "rs3m": round(rs_3m, 1),
-        "avgVolume": avg_vol_20d,
-    }
-    return score, metrics
-
-
-def calc_funda_score(info: dict):
-    rev_growth = info.get("revenueGrowth")
-    roe = info.get("returnOnEquity")
-    debt_to_eq = info.get("debtToEquity")
-    forward_pe = info.get("forwardPE")
-    profit_margin = info.get("profitMargins")
-
-    g_score = 15 if rev_growth is None else max(0, min(30, 12 + rev_growth * 80))
-
-    if roe is not None:
-        roe_score = max(0, min(30, roe * 100))
-    elif profit_margin is not None:
-        roe_score = max(0, min(30, 12 + profit_margin * 60))
-    else:
-        roe_score = 14
-
-    if debt_to_eq is None:
-        d_score = 12
-    elif debt_to_eq < 50:
-        d_score = 20
-    elif debt_to_eq < 120:
-        d_score = 14
-    elif debt_to_eq < 250:
-        d_score = 8
-    else:
-        d_score = 3
-
-    if forward_pe is None or forward_pe <= 0:
-        pe_score = 8
-    elif forward_pe < 18:
-        pe_score = 20
-    elif forward_pe < 28:
-        pe_score = 15
-    elif forward_pe < 45:
-        pe_score = 9
-    else:
-        pe_score = 4
-
-    return clamp(g_score + roe_score + d_score + pe_score)
-
-
-def determine_status_and_rating(m: dict, tech_score: int, funda_score: int):
-    p = m["price"]
-    s50 = m["sma50"]
-    s200 = m["sma200"]
-    rsi = m["rsi"]
-    low52 = m["low52w"]
-    high52 = m["high52w"]
-    pos_in_range = (p - low52) / max(0.01, (high52 - low52))
-    weight_sum = max(0.01, TECH_WEIGHT + FUNDA_WEIGHT)
-    total_score = (tech_score * TECH_WEIGHT + funda_score * FUNDA_WEIGHT) / weight_sum
-
-    if p < s200 * 0.94 and p < s50 and rsi < 38:
-        status = "Bodenbildung" if pos_in_range < 0.22 else "Trendbruch"
-    elif p < s200 and p > s50 and rsi >= 45:
-        status = "Turnaround"
-    elif p < s200 and pos_in_range < 0.25:
-        status = "Boden abwarten"
-    elif p > s200 and p < s50:
-        status = "Dynamikverlust"
-    elif p > s200 and rsi > 72:
-        status = "Regression abwarten"
-    elif p > s200 and p > s50 and total_score >= 62:
-        status = "Position verwalten"
-    else:
-        status = "Underperformance"
-
-    if total_score >= 60 and status in ("Bodenbildung", "Turnaround", "Position verwalten", "Regression abwarten"):
-        rating = "kaufen"
-    elif total_score < 42 or status == "Trendbruch":
-        rating = "verkaufen"
-    else:
-        rating = "halten"
-
-    chance = max(1, min(5, math.ceil(total_score / 20)))
-    vol_spread = (high52 - low52) / max(0.01, low52)
-    risk = 5 if vol_spread > 1.2 or funda_score < 40 else (4 if vol_spread > 0.75 else (3 if vol_spread > 0.45 else 2))
-
-    return status, rating, chance, risk
-
-
-def build_dataset():
-    bench_mom3m = get_benchmark_mom3m("^GSPC")
-    print(f"Benchmark S&P 500 3M-Momentum: {bench_mom3m}%")
-
-    universe = build_universe()
-    print(f"Starte Analyse für {len(universe)} Ticker...")
-    results = []
-
-    for idx, item in enumerate(universe, start=1):
-        symbol = item["ticker"]
+    for i in range(0, len(all_tickers), BATCH_SIZE):
+        chunk = all_tickers[i:i + BATCH_SIZE]
+        print(f"Lade Kurs-Batch {i // BATCH_SIZE + 1}/{(len(all_tickers) - 1) // BATCH_SIZE + 1} ({len(chunk)} Ticker)...")
         try:
-            tk = yf.Ticker(symbol)
-            hist = tk.history(period="1y", interval="1d")
-            if hist.empty or len(hist) < 30:
+            df = yf.download(
+                chunk,
+                period="1y",
+                interval="1d",
+                group_by="ticker",
+                auto_adjust=True,
+                threads=True,
+                progress=False,
+            )
+            if df.empty:
                 continue
 
-            close = hist["Close"].dropna()
-            tech_score, m = calc_tech_score(hist, bench_mom3m)
-
-            info = {}
-            try:
-                info = tk.info or {}
-            except Exception:
-                info = {}
-
-            funda_score = calc_funda_score(info)
-            status, rating, chance, risk = determine_status_and_rating(m, tech_score, funda_score)
-
-            step = max(1, len(close) // 24)
-            chart_points = [round(float(x), 2) for x in close.iloc[::step].tolist()]
-            if chart_points[-1] != m["price"]:
-                chart_points.append(m["price"])
-
-            raw_country = info.get("country", "United States")
-            raw_sector = info.get("sector", "Technology")
-            resolved_name = item.get("name") or info.get("shortName") or info.get("longName") or symbol
-            resolved_isin = item.get("isin") or info.get("isin") or "—"
-
-            results.append(
-                {
-                    "name": resolved_name,
-                    "ticker": symbol,
-                    "isin": resolved_isin,
-                    "strategy": item["strategy"],
-                    "tag": item["tag"],
-                    "chance": chance,
-                    "risk": risk,
-                    "rating": rating,
-                    "status": status,
-                    "country": COUNTRY_MAP.get(raw_country, raw_country),
-                    "sector": SECTOR_MAP.get(raw_sector, raw_sector),
-                    "tech_score": tech_score,
-                    "funda_score": funda_score,
-                    "price": m["price"],
-                    "currency": info.get("currency", "USD"),
-                    "sma50": m["sma50"],
-                    "sma200": m["sma200"],
-                    "high52w": m["high52w"],
-                    "distHighPct": m["distHighPct"],
-                    "rsi": m["rsi"],
-                    "mom3m": m["mom3m"],
-                    "rs3m": m["rs3m"],
-                    "avgVolume": m["avgVolume"],
-                    "forwardPE": round(info["forwardPE"], 1) if info.get("forwardPE") else None,
-                    "revGrowth": round(info["revenueGrowth"] * 100, 1) if info.get("revenueGrowth") else None,
-                    "history": chart_points,
-                }
-            )
-
-            if idx % 35 == 0:
-                time.sleep(0.8)
+            if len(chunk) == 1:
+                sym = chunk[0]
+                sub = df.dropna(subset=["Close"])
+                if len(sub) >= 60:
+                    history_map[sym] = sub
+            else:
+                for sym in chunk:
+                    if sym in df.columns.get_level_values(0):
+                        sub = df[sym].dropna(subset=["Close"])
+                        if len(sub) >= 60:
+                            history_map[sym] = sub
         except Exception as e:
-            print(f"Fehler bei {symbol}: {e}")
+            print(f"Batch-Fehler bei Block {i}: {e}")
+        time.sleep(0.5)
+
+    return history_map
+
+
+def fetch_info_single(sym: str) -> tuple[str, dict]:
+    time.sleep(random.uniform(0.05, 0.2))
+    try:
+        info = yf.Ticker(sym).info or {}
+        return sym, info
+    except Exception:
+        return sym, {}
+
+
+def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, core_set: set[str]) -> dict | None:
+    close = hist["Close"].dropna()
+    volume = hist["Volume"].dropna() if "Volume" in hist else pd.Series(dtype=float)
+
+    if len(close) < 65:
+        return None
+
+    price = float(close.iloc[-1])
+    high_52w = float(close.max())
+    dist_52w = ((price - high_52w) / high_52w) * 100.0 if high_52w > 0 else 0.0
+
+    price_3m_ago = float(close.iloc[-63]) if len(close) >= 63 else float(close.iloc[0])
+    ret_3m = ((price - price_3m_ago) / price_3m_ago) * 100.0 if price_3m_ago > 0 else 0.0
+    rs_3m = ret_3m - sp500_3m_ret
+
+    sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else price
+    sma200 = float(close.rolling(200).mean().iloc[-1]) if len(close) >= 200 else sma50
+    rsi = compute_rsi(close, 14)
+
+    avg_vol_20 = float(volume.tail(20).mean()) if len(volume) >= 20 else 0.0
+    dollar_vol = avg_vol_20 * price
+
+    # Tech-Score (0-100)
+    tech_score = 0
+    if price > sma50:
+        tech_score += 25
+    if price > sma200:
+        tech_score += 25
+    if sma50 > sma200:
+        tech_score += 10
+    if rs_3m > 0:
+        tech_score += min(20, int(rs_3m * 1.2))
+    if 45 <= rsi <= 68:
+        tech_score += 10
+    elif 30 <= rsi < 45:
+        tech_score += 5
+    if dist_52w >= -15:
+        tech_score += 10
+    tech_score = max(0, min(100, tech_score))
+
+    # Funda-Score (0-100)
+    funda_score = 40  # Solider Basiswert, falls yfinance einzelne Felder nicht liefert
+    rev_growth = info.get("revenueGrowth")
+    roe = info.get("returnOnEquity")
+    profit_margin = info.get("profitMargins")
+    fwd_pe = info.get("forwardPE")
+    debt_eq = info.get("debtToEquity")
+
+    if isinstance(rev_growth, (int, float)):
+        if rev_growth > 0.20:
+            funda_score += 20
+        elif rev_growth > 0.08:
+            funda_score += 12
+        elif rev_growth > 0:
+            funda_score += 5
+        else:
+            funda_score -= 10
+
+    if isinstance(roe, (int, float)):
+        if roe > 0.18:
+            funda_score += 15
+        elif roe > 0.08:
+            funda_score += 8
+        elif roe < 0:
+            funda_score -= 10
+
+    if isinstance(profit_margin, (int, float)):
+        if profit_margin > 0.15:
+            funda_score += 15
+        elif profit_margin > 0.05:
+            funda_score += 8
+        elif profit_margin < 0:
+            funda_score -= 8
+
+    if isinstance(fwd_pe, (int, float)) and 0 < fwd_pe < 25:
+        funda_score += 10
+
+    if isinstance(debt_eq, (int, float)) and debt_eq > 200:
+        funda_score -= 10
+
+    funda_score = max(0, min(100, funda_score))
+
+    total_score = round(tech_score * 0.6 + funda_score * 0.4, 1)
+
+    # Phase bestimmen
+    if price > sma50 and price > sma200 and rs_3m > 0:
+        phase = "Aufwärtstrend"
+    elif price > sma50 and price <= sma200:
+        phase = "Turnaround"
+    elif price <= sma50 and price > sma200:
+        phase = "Rücksetzer"
+    else:
+        phase = "Boden abwarten"
+
+    # Signal bestimmen
+    if total_score >= 62 and price > sma50:
+        signal = "kaufen"
+    elif total_score >= 45:
+        signal = "halten"
+    else:
+        signal = "meiden"
+
+    chance = max(1, min(5, math.ceil(total_score / 20)))
+
+    # Risiko (1-5)
+    daily_vol = float(close.pct_change().dropna().std() * np.sqrt(252) * 100)
+    if daily_vol < 25:
+        risk = 2
+    elif daily_vol < 40:
+        risk = 3
+    elif daily_vol < 60:
+        risk = 4
+    else:
+        risk = 5
+
+    name = info.get("shortName") or info.get("longName") or sym
+    currency = info.get("currency") or ("EUR" if sym.endswith((".DE", ".PA")) else "USD")
+    sector = info.get("sector") or "Sonstige"
+
+    return {
+        "ticker": sym,
+        "name": name,
+        "is_core": sym in core_set,
+        "sector": sector,
+        "currency": currency,
+        "price": round(price, 2),
+        "signal": signal,
+        "phase": phase,
+        "chance": chance,
+        "risk": risk,
+        "tech_score": tech_score,
+        "funda_score": funda_score,
+        "total_score": total_score,
+        "ret_3m": round(ret_3m, 1),
+        "rs_3m": round(rs_3m, 1),
+        "dist_52w": round(dist_52w, 1),
+        "rsi": rsi,
+        "avg_volume": int(avg_vol_20),
+        "dollar_volume": int(dollar_vol),
+        "above_sma50": bool(price > sma50),
+        "above_sma200": bool(price > sma200),
+    }
+
+
+def main():
+    tickers = build_ticker_universe()
+    core_set = set(CORE_UNIVERSE)
+
+    history_map = download_history_batches(tickers)
+    print(f"Gültige Kursreihen geladen: {len(history_map)}")
+
+    sp500_hist = history_map.get("^GSPC")
+    if sp500_hist is not None and len(sp500_hist["Close"]) >= 63:
+        sp_c = sp500_hist["Close"].dropna()
+        sp500_3m_ret = ((float(sp_c.iloc[-1]) - float(sp_c.iloc[-63])) / float(sp_c.iloc[-63])) * 100.0
+    else:
+        sp500_3m_ret = 0.0
+
+    valid_symbols = [s for s in tickers if s in history_map]
+
+    info_map = {}
+    with ThreadPoolExecutor(max_workers=INFO_WORKERS) as executor:
+        futures = {executor.submit(fetch_info_single, sym): sym for sym in valid_symbols}
+        for idx, future in enumerate(as_completed(futures), 1):
+            sym, info = future.result()
+            info_map[sym] = info
+            if idx % 100 == 0:
+                print(f"Fundamentaldaten geladen: {idx}/{len(valid_symbols)}")
+
+    results = []
+    for sym in valid_symbols:
+        item = score_stock(sym, history_map[sym], info_map.get(sym, {}), sp500_3m_ret, core_set)
+        if item is not None:
+            results.append(item)
+
+    results.sort(key=lambda x: (x["is_core"], x["total_score"]), reverse=True)
 
     payload = {
-        "updated_at": datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC"),
+        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "count": len(results),
-        "benchmark_mom3m": bench_mom3m,
-        "weights": {"tech": TECH_WEIGHT, "funda": FUNDA_WEIGHT},
         "stocks": results,
     }
+
     with open("data.json", "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
-    print(f"Fertig: {len(results)} Werte in data.json gespeichert.")
+
+    print(f"Fertig! {len(results)} Aktien in data.json gespeichert.")
 
 
 if __name__ == "__main__":
-    build_dataset()
+    main()

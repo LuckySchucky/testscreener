@@ -21,7 +21,6 @@ CORE_UNIVERSE = [
     "COHR", "AMBA", "ENR.DE", "RHM.DE", "SU.PA", "005930.KS", "000660.KS"
 ]
 
-# Zusätzlicher liquider Pool (US/EU/Sektor-Werte), falls Wikipedia-Listen < 1.000 liefern
 EXTRA_UNIVERSE = [
     "NBIS", "HIMS", "RKLB", "RDW", "BTDR", "CLSK", "MARA", "RIOT", "SMCI",
     "ARM", "MRVL", "AVGO", "TSM", "ASML", "SMH", "SOXL", "PLTR", "APP",
@@ -236,6 +235,8 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
     rsi = compute_rsi(close, 14)
 
     avg_vol_20 = float(volume.tail(20).mean()) if len(volume) >= 20 else 0.0
+    last_vol = float(volume.iloc[-1]) if len(volume) >= 1 else 0.0
+    vol_spike = (last_vol > avg_vol_20 * 1.35) if avg_vol_20 > 0 else False
 
     tech_score = 0
     if price > sma50:
@@ -327,12 +328,32 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
     else:
         strategy = "Wachstum"
 
-    if total_score >= 60 and price > sma50 and status in ("Starker Aufwärtstrend", "Erster Ausbruch", "Boden-Check"):
+    # Erweiterte Kaufsignal-Logik für Swing- & Rebound-Setups
+    is_trend_buy = (total_score >= 56 and price > sma50 and status == "Starker Aufwärtstrend")
+    is_breakout_buy = (total_score >= 55 and price > sma50 and status == "Erster Ausbruch" and (rs_3m > -3 or vol_spike))
+    is_pullback_buy = (status == "Gesunder Rücksetzer" and price > sma200 and funda_score >= 60 and rsi >= 32)
+    is_bottom_buy = (status == "Boden-Check" and total_score >= 52 and (rs_3m > -5 or vol_spike))
+
+    if is_trend_buy or is_breakout_buy or is_pullback_buy or is_bottom_buy:
         rating = "kaufen"
     elif total_score < 38 or status == "Klarer Abwärtstrend":
         rating = "verkaufen"
     else:
         rating = "halten"
+
+    if rating == "kaufen":
+        if is_pullback_buy:
+            setup_label = "Pullback-Chance"
+        elif is_breakout_buy:
+            setup_label = "Ausbruch-Setup"
+        elif is_bottom_buy:
+            setup_label = "Boden-Rebound"
+        else:
+            setup_label = "Trend-Fortsetzung"
+    elif rating == "verkaufen":
+        setup_label = "Schwacher Trend"
+    else:
+        setup_label = "Beobachten"
 
     chance = max(1, min(5, math.ceil(total_score / 20)))
 
@@ -351,7 +372,7 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
     sector = info.get("sector") or "Sonstige"
     country = info.get("country") or ("Germany" if sym.endswith(".DE") else ("France" if sym.endswith(".PA") else "USA"))
     isin = info.get("isin") or "—"
-    tag = "Fokus-Liste" if sym in core_set else (sector if sector != "Sonstige" else "")
+    tag = "Fokus-Liste" if sym in core_set else setup_label
 
     history_pts = [round(float(x), 2) for x in close.tail(60).tolist()]
 
@@ -360,6 +381,7 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
         "name": name,
         "isin": isin,
         "tag": tag,
+        "setup_label": setup_label,
         "strategy": strategy,
         "rating": rating,
         "status": status,

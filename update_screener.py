@@ -11,12 +11,12 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-MAX_TICKERS = 900
+MAX_TICKERS = 800
 BATCH_SIZE = 100
 INFO_WORKERS = 8
 
 CORE_UNIVERSE = [
-    "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "BTU", "NVVE",
+    "ORCL", "IREN", "ZENA", "VLN", "RUN", "EOSE", "DFLI", "BTU", "NVVE",
     "DELL", "INTC", "AAPL", "VRT", "CLS", "CRWD", "LLY", "NVDA", "MU",
     "COHR", "AMBA", "ENR.DE", "RHM.DE", "SU.PA", "005930.KS", "000660.KS"
 ]
@@ -282,21 +282,21 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
     total_score = round(tech_score * 0.6 + funda_score * 0.4, 1)
 
     if price > sma50 and price > sma200 and rs_3m > 5 and rsi <= 72:
-        status = "Position verwalten"
+        status = "Starker Aufwärtstrend"
     elif price > sma50 and price <= sma200:
-        status = "Turnaround"
+        status = "Erster Ausbruch"
     elif price <= sma50 and price > sma200 and rsi < 45:
-        status = "Regression abwarten"
+        status = "Gesunder Rücksetzer"
     elif price <= sma50 and price > sma200:
-        status = "Dynamikverlust"
+        status = "Trend-Abkühlung"
     elif price < sma200 and dist_52w < -25 and rsi >= 42 and price > sma20:
-        status = "Bodenbildung"
+        status = "Boden-Check"
     elif price < sma50 and price < sma200 and dist_52w < -20:
-        status = "Boden abwarten"
+        status = "Korrektur / Abwärtstrend"
     elif price < sma200 and rs_3m < -10:
-        status = "Trendbruch"
+        status = "Klarer Abwärtstrend"
     else:
-        status = "Underperformance"
+        status = "Seitwärts / Schwach"
 
     if isinstance(div_yield, (int, float)) and div_yield >= 0.032:
         strategy = "Dividende"
@@ -307,9 +307,9 @@ def score_stock(sym: str, hist: pd.DataFrame, info: dict, sp500_3m_ret: float, c
     else:
         strategy = "Wachstum"
 
-    if total_score >= 60 and price > sma50 and status in ("Position verwalten", "Turnaround", "Bodenbildung"):
+    if total_score >= 60 and price > sma50 and status in ("Starker Aufwärtstrend", "Erster Ausbruch", "Boden-Check"):
         rating = "kaufen"
-    elif total_score < 38 or status == "Trendbruch":
+    elif total_score < 38 or status == "Klarer Abwärtstrend":
         rating = "verkaufen"
     else:
         rating = "halten"
